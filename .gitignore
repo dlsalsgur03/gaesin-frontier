@@ -9,3 +9,8 @@ coverage/
 
 .DS_Store
 *.log
+
+# prisma generated client
+backend/src/generated/prisma
+
+*.tsbuildinfo

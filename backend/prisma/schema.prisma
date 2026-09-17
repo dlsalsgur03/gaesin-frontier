@@ -3,12 +3,194 @@
 
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
+// ============================================================
+// ERD와 Prisma 구현 차이
+//
+// 1. ERD의 일부 VARCHAR 컬럼을 Prisma enum으로 변경
+//    - Assignment.status : VARCHAR(20) -> AssignmentStatus
+//    - TeamAssignment.status : VARCHAR(20) -> AssignmentStatus
+//    - Task.status : VARCHAR(20) -> AssignmentStatus
+//    - TeamMember.role : VARCHAR(20) -> TeamRole
+//
+// 2. ERD에서는 nullable이었던 필드 중 실제 서비스에서
+//    필수라고 판단한 필드는 NOT NULL로 변경
+//
+// 3. created_at / updated_at은 ERD에서는 nullable이지만,
+//    Prisma에서 자동 생성/갱신하도록 NOT NULL로 구현
+//
+// 4. 데이터 무결성을 위해 ERD에 없던 UNIQUE 제약조건 추가
+//    - User.email
+//    - Team.inviteCode
+//    - TeamMember(teamId, userId)
+//
+// 5. File.team_id는 ERD에서는 NOT NULL이지만,
+//    개인 과제 파일도 저장할 수 있도록 Prisma에서는 nullable로 변경
+// ============================================================
+
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
   moduleFormat = "cjs"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum AssignmentStatus {
+  TODO
+  DONE
+}
+
+enum TeamRole {
+  OWNER
+  MEMBER
+}
+
+model User {
+  id           BigInt   @id @default(autoincrement())
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  nickname     String   @db.VarChar(50)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  assignments  Assignment[]
+  teams        Team[]
+  team_members TeamMember[]
+  tasks        Task[]
+  messages     Message[]
+  files        File[]
+
+  @@map("users")
+}
+
+model Assignment {
+  id          BigInt           @id @default(autoincrement())
+  userId      BigInt           @map("user_id")
+  title       String           @db.VarChar(100)
+  description String?
+  dueDate     DateTime?        @map("due_date")
+  status      AssignmentStatus @default(TODO)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  files File[]
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("assignments")
+}
+
+model Team {
+  id         BigInt   @id @default(autoincrement())
+  name       String   @db.VarChar(100)
+  inviteCode String   @unique @map("invite_code") @db.VarChar(50)
+  ownerId    BigInt   @map("owner_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  team_assignments TeamAssignment[]
+  team_members     TeamMember[]
+  schedules        Schedule[]
+  messages         Message[]
+  files            File[]
+
+  user User @relation(fields: [ownerId], references: [id])
+
+  @@map("teams")
+}
+
+model TeamAssignment {
+  id          BigInt           @id @default(autoincrement())
+  teamId      BigInt           @map("team_id")
+  title       String           @db.VarChar(100)
+  description String?
+  dueDate     DateTime?        @map("due_date")
+  status      AssignmentStatus @default(TODO)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  files File[]
+  tasks Task[]
+
+  team Team @relation(fields: [teamId], references: [id])
+
+  @@map("team_assignments")
+}
+
+model TeamMember {
+  id       BigInt   @id @default(autoincrement())
+  teamId   BigInt   @map("team_id")
+  userId   BigInt   @map("user_id")
+  role     TeamRole
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  user User @relation(fields: [userId], references: [id])
+  team Team @relation(fields: [teamId], references: [id])
+
+  @@unique([teamId, userId])
+  @@map("team_members")
+}
+
+model Task {
+  id               BigInt           @id @default(autoincrement())
+  teamAssignmentId BigInt           @map("team_assignment_id")
+  assigneeId       BigInt?          @map("assignee_id")
+  title            String           @db.VarChar(100)
+  description      String?
+  status           AssignmentStatus @default(TODO)
+  dueDate          DateTime?        @map("due_date")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  user           User?          @relation(fields: [assigneeId], references: [id])
+  teamAssignment TeamAssignment @relation(fields: [teamAssignmentId], references: [id])
+
+  @@map("tasks")
+}
+
+model Schedule {
+  id          BigInt   @id @default(autoincrement())
+  teamId      BigInt   @map("team_id")
+  title       String   @db.VarChar(100)
+  description String?
+  startAt     DateTime @map("start_at")
+  endAt       DateTime @map("end_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  team Team @relation(fields: [teamId], references: [id])
+
+  @@map("schedules")
+}
+
+model Message {
+  id        BigInt   @id @default(autoincrement())
+  teamId    BigInt   @map("team_id")
+  userId    BigInt   @map("user_id")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+  team Team @relation(fields: [teamId], references: [id])
+
+  @@map("messages")
+}
+
+model File {
+  id               BigInt   @id @default(autoincrement())
+  teamId           BigInt?  @map("team_id")
+  userId           BigInt   @map("user_id")
+  fileName         String   @map("file_name") @db.VarChar(255)
+  fileUrl          String   @map("file_url")
+  createdAt        DateTime @default(now()) @map("created_at")
+  assignmentId     BigInt?  @map("assignment_id")
+  teamAssignmentId BigInt?  @map("team_assignment_id")
+
+  team           Team?           @relation(fields: [teamId], references: [id])
+  user           User            @relation(fields: [userId], references: [id])
+  assignment     Assignment?     @relation(fields: [assignmentId], references: [id])
+  teamAssignment TeamAssignment? @relation(fields: [teamAssignmentId], references: [id])
+
+  @@map("files")
 }
