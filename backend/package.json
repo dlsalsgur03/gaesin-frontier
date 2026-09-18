@@ -25,6 +25,9 @@
     "@nestjs/platform-express": "^12.0.1",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
+    "argon2": "^0.45.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
     "dotenv": "^17.4.2",
     "pg": "^8.23.0",
     "reflect-metadata": "^0.2.2",
@@ -54,11 +57,15 @@
   "overrides": {
     "@nestjs/platform-express": {
       "multer": "2.3.0"
+    },
+    "prisma": {
+      "mysql2": "3.23.1"
     }
   },
   "allowScripts": {
     "prisma@7.10.0": true,
     "@prisma/engines@7.10.0": true,
-    "@prisma/client@7.10.0": true
+    "@prisma/client@7.10.0": true,
+    "argon2@0.45.1": true
   }
 }
