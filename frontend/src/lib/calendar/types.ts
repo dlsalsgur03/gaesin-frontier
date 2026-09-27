@@ -1,4 +1,4 @@
-/** API 응답을 변환해서 전달할 화면용 모델. 날짜는 지역 날짜 YYYY-MM-DD 형식이다. */
+/** 캘린더 API 응답 모델. 날짜는 UTC 기준 YYYY-MM-DD이며 화면에서 시간대 변환 없이 표시한다. */
 type AssignmentBase = {
   /** Prisma BigInt ID는 API에서 문자열로 전달받는다. */
   id: string;

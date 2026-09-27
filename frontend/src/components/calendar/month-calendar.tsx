@@ -22,11 +22,20 @@ const buttonClass =
 
 export default function MonthCalendar({
   assignments,
+  month,
+  onMonthChange,
+  isLoading,
+  error,
+  onReload,
 }: {
   assignments: readonly CalendarAssignment[];
+  month: Date;
+  onMonthChange: (month: Date) => void;
+  isLoading: boolean;
+  error: string;
+  onReload: () => void;
 }) {
   const [today, setToday] = useState(() => new Date());
-  const [month, setMonth] = useState(() => startOfMonth(today));
   const [filter, setFilter] =
     useState<(typeof filters)[number]["value"]>("all");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -69,7 +78,7 @@ export default function MonthCalendar({
   function goToToday() {
     const now = new Date();
     setToday(now);
-    setMonth(startOfMonth(now));
+    onMonthChange(startOfMonth(now));
   }
 
   return (
@@ -109,7 +118,7 @@ export default function MonthCalendar({
             type="button"
             aria-label="이전 달"
             className={`${buttonClass} w-10 px-0`}
-            onClick={() => setMonth((current) => moveMonth(current, -1))}
+            onClick={() => onMonthChange(moveMonth(month, -1))}
           >
             <span aria-hidden="true" className="text-xl">
               ‹
@@ -127,7 +136,7 @@ export default function MonthCalendar({
             type="button"
             aria-label="다음 달"
             className={`${buttonClass} w-10 px-0`}
-            onClick={() => setMonth((current) => moveMonth(current, 1))}
+            onClick={() => onMonthChange(moveMonth(month, 1))}
           >
             <span aria-hidden="true" className="text-xl">
               ›
@@ -155,6 +164,14 @@ export default function MonthCalendar({
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-600">
+          <button
+            type="button"
+            onClick={onReload}
+            disabled={isLoading}
+            className={`${buttonClass} disabled:cursor-wait disabled:opacity-50`}
+          >
+            새로고침
+          </button>
           <span className="inline-flex items-center gap-1.5">
             <span
               aria-hidden="true"
@@ -171,18 +188,37 @@ export default function MonthCalendar({
           </span>
         </div>
       </div>
-      <p
-        role="status"
-        aria-atomic="true"
-        className="px-5 pb-4 text-sm text-zinc-500 sm:px-7"
-      >
-        {visibleAssignments.length > 0
-          ? `표시된 과제 ${visibleAssignments.length}개 · 과제를 선택하면 자세한 정보를 볼 수 있습니다.`
-          : "표시할 과제가 없습니다."}
-      </p>
+      {error ? (
+        <div
+          role="alert"
+          className="mx-5 mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700 sm:mx-7"
+        >
+          <p>{error}</p>
+          <button
+            type="button"
+            onClick={onReload}
+            className="min-h-10 rounded-lg px-3 font-semibold underline focus-visible:outline-2 focus-visible:outline-blue-600"
+          >
+            다시 시도
+          </button>
+        </div>
+      ) : (
+        <p
+          role="status"
+          aria-atomic="true"
+          className="px-5 pb-4 text-sm text-zinc-500 sm:px-7"
+        >
+          {isLoading
+            ? "과제 일정을 불러오고 있습니다."
+            : visibleAssignments.length > 0
+              ? `표시된 과제 ${visibleAssignments.length}개 · 과제를 선택하면 자세한 정보를 볼 수 있습니다.`
+              : "표시할 과제가 없습니다."}
+        </p>
+      )}
 
       <div
         role="region"
+        aria-busy={isLoading}
         aria-label="월별 캘린더, 좁은 화면에서는 좌우로 스크롤하세요"
         tabIndex={0}
         className="overflow-x-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-600"
@@ -214,8 +250,8 @@ export default function MonthCalendar({
         </div>
       </div>
       <p className="border-t border-zinc-200 px-5 py-4 text-sm text-zinc-500 sm:px-7">
-        현재 예시 과제가 표시됩니다. 막대는 시작일과 마감일을 모두 포함하며, 양
-        끝의 화살표는 이전·다음 주로 이어지는 과제를 뜻합니다.
+        시작일과 마감일이 모두 있는 과제만 표시됩니다. 막대는 양 끝 날짜를 모두
+        포함하며, 양 끝의 화살표는 이전·다음 주로 이어지는 과제를 뜻합니다.
       </p>
       {selectedAssignment && (
         <AssignmentDialog
