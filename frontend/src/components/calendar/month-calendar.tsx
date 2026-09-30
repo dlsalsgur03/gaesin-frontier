@@ -10,6 +10,7 @@ import {
 import type { CalendarAssignment } from "@/lib/calendar/types";
 import CalendarWeek from "./calendar-week";
 import AssignmentDialog from "./assignment-dialog";
+import PersonalAssignmentDialog from "./personal-assignment-dialog";
 
 const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
 const filters = [
@@ -38,6 +39,8 @@ export default function MonthCalendar({
   const [today, setToday] = useState(() => new Date());
   const [filter, setFilter] =
     useState<(typeof filters)[number]["value"]>("all");
+  const [editor, setEditor] = useState<{ id?: string } | null>(null);
+  const [notice, setNotice] = useState("");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const monthLabel = `${month.getFullYear()}년 ${month.getMonth() + 1}월`;
   const todayKey = dateKey(today);
@@ -57,7 +60,10 @@ export default function MonthCalendar({
   );
 
   function handleSelectAssignment(assignment: CalendarAssignment) {
-    // 상세 화면 구현 후 종류·id·teamId에 따른 라우팅을 연결할 위치.
+    if (assignment.kind === "personal") {
+      setEditor({ id: assignment.id });
+      return;
+    }
     setSelectedKey(`${assignment.kind}:${assignment.id}`);
   }
 
@@ -96,6 +102,13 @@ export default function MonthCalendar({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className={buttonClass}
+            onClick={() => setEditor({})}
+          >
+            개인 과제 등록
+          </button>
           <span
             aria-hidden="true"
             className="h-2 w-2 rounded-full bg-blue-600"
@@ -188,6 +201,11 @@ export default function MonthCalendar({
           </span>
         </div>
       </div>
+      {notice && (
+        <p role="status" className="px-5 pb-3 text-sm text-blue-700 sm:px-7">
+          {notice}
+        </p>
+      )}
       {error ? (
         <div
           role="alert"
@@ -253,6 +271,23 @@ export default function MonthCalendar({
         시작일과 마감일이 모두 있는 과제만 표시됩니다. 막대는 양 끝 날짜를 모두
         포함하며, 양 끝의 화살표는 이전·다음 주로 이어지는 과제를 뜻합니다.
       </p>
+      {editor && (
+        <PersonalAssignmentDialog
+          id={editor.id}
+          initialDate={dateKey(month)}
+          onClose={() => setEditor(null)}
+          onSaved={(date) => {
+            setEditor(null);
+            setNotice(date ? "과제를 저장했습니다." : "과제를 삭제했습니다.");
+            if (date) {
+              const [year, monthIndex] = date.split("-").map(Number);
+              onMonthChange(new Date(year, monthIndex - 1, 1));
+              if (filter === "team") setFilter("personal");
+            }
+            onReload();
+          }}
+        />
+      )}
       {selectedAssignment && (
         <AssignmentDialog
           assignment={selectedAssignment}

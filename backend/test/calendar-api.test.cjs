@@ -15,6 +15,7 @@ const request = require('supertest');
 
 // 실행 중인 앱의 비밀키나 인증 세션을 사용하지 않는다.
 process.env.JWT_SECRET = 'calendar-api-integration-test-secret-only';
+const { AssignmentsModule } = require('../dist/assignments/assignments.module');
 const { CalendarModule } = require('../dist/calendar/calendar.module');
 const { PrismaService } = require('../dist/prisma/prisma.service');
 const { PrismaClient } = require('../dist/generated/prisma/client');
@@ -175,7 +176,7 @@ before(async () => {
   });
 
   const moduleRef = await Test.createTestingModule({
-    imports: [CalendarModule],
+    imports: [CalendarModule, AssignmentsModule],
   })
     .overrideProvider(PrismaService)
     .useValue(prisma)
@@ -348,4 +349,138 @@ test('팀 탈퇴가 다음 조회에 반영된다', async () => {
     body.assignments.some((task) => task.kind === 'team'),
     false,
   );
+});
+
+test('개인 과제 CRUD·소유권·캘린더 반영', async () => {
+  const payload = {
+    title: '  새 개인 과제  ',
+    description: '설명',
+    startDate: '2026-09-20',
+    dueDate: '2026-09-22',
+    status: 'TODO',
+  };
+  const server = app.getHttpServer();
+  const created = await request(server)
+    .post('/assignments')
+    .set('Cookie', cookie)
+    .send(payload)
+    .expect(201);
+  const id = created.body.assignment.id;
+  assert.equal(created.body.assignment.title, '새 개인 과제');
+  assert.equal(typeof id, 'string');
+  const stored = await prisma.assignment.findUnique({
+    where: { id: BigInt(id) },
+  });
+  assert.equal(stored.startDate.toISOString(), '2026-09-20T00:00:00.000Z');
+  await request(server)
+    .get(`/assignments/${id}`)
+    .set('Cookie', cookie)
+    .expect(200);
+  for (const method of ['get', 'put', 'delete']) {
+    const req = request(server)
+      [method](`/assignments/${id}`)
+      .set('Cookie', otherCookie);
+    if (method === 'put') req.send(payload);
+    await req.expect(404);
+  }
+  const updated = await request(server)
+    .put(`/assignments/${id}`)
+    .set('Cookie', cookie)
+    .send({
+      ...payload,
+      title: '수정한 과제',
+      description: '',
+      status: 'DONE',
+      dueDate: '2026-09-23',
+    })
+    .expect(200);
+  assert.equal(updated.body.assignment.description, '');
+  const calendar = await request(server)
+    .get(endpoint)
+    .query(range)
+    .set('Cookie', cookie)
+    .expect(200);
+  const visible = calendar.body.assignments.find(
+    (task) => task.kind === 'personal' && task.id === id,
+  );
+  assert.equal(visible.status, 'DONE');
+  assert.equal(visible.title, '수정한 과제');
+  assert.equal(visible.dueDate, '2026-09-23');
+  await request(server)
+    .delete(`/assignments/${id}`)
+    .set('Cookie', cookie)
+    .expect(200);
+  await request(server)
+    .get(`/assignments/${id}`)
+    .set('Cookie', cookie)
+    .expect(404);
+  await request(server)
+    .delete(`/assignments/${id}`)
+    .set('Cookie', cookie)
+    .expect(404);
+  const afterDelete = await request(server)
+    .get(endpoint)
+    .query(range)
+    .set('Cookie', cookie)
+    .expect(200);
+  assert.equal(
+    afterDelete.body.assignments.some(
+      (task) => task.kind === 'personal' && task.id === id,
+    ),
+    false,
+  );
+});
+
+test('개인 과제 입력 검증과 미인증 차단', async () => {
+  const payload = {
+    title: '과제',
+    startDate: '2026-09-20',
+    dueDate: '2026-09-22',
+    status: 'TODO',
+  };
+  const server = app.getHttpServer();
+  await request(server).post('/assignments').send(payload).expect(401);
+  for (const method of ['get', 'put', 'delete']) {
+    const req = request(server)[method]('/assignments/1');
+    if (method === 'put') req.send(payload);
+    await req.expect(401);
+  }
+  for (const invalid of [
+    { title: '' },
+    { title: '   ' },
+    { title: '가'.repeat(101) },
+    { title: null },
+    { startDate: '2026-02-30' },
+    { startDate: '2026-9-01' },
+    { startDate: null },
+    { startDate: '2026-09-23' },
+    { dueDate: '2026-09-20T00:00:00Z' },
+    { status: 'INVALID' },
+    { status: null },
+    { description: null },
+    { description: 'x'.repeat(10001) },
+    { userId: '2' },
+  ]) {
+    await request(server)
+      .post('/assignments')
+      .set('Cookie', cookie)
+      .send({ ...payload, ...invalid })
+      .expect(400);
+    await request(server)
+      .put('/assignments/1')
+      .set('Cookie', cookie)
+      .send({ ...payload, ...invalid })
+      .expect(400);
+  }
+  await request(server)
+    .post('/assignments')
+    .set('Cookie', cookie)
+    .send({})
+    .expect(400);
+  for (const id of ['0', '-1', 'abc', '9223372036854775808']) {
+    await request(server)
+      .get(`/assignments/${id}`)
+      .set('Cookie', cookie)
+      .expect(400);
+  }
 });
