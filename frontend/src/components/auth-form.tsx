@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { ApiError, apiRequest } from "../lib/api";
 
-type AuthFromProps = {
+type AuthFormProps = {
   mode: "login" | "signup";
 };
 

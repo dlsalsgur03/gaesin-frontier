@@ -70,6 +70,8 @@ model Assignment {
   userId      BigInt           @map("user_id")
   title       String           @db.VarChar(100)
   description String?
+  /// 과제 시작일. 기존 과제의 시작일은 알 수 없으므로 기본값 없이 선택값으로 둔다.
+  startDate   DateTime?        @map("start_date")
   dueDate     DateTime?        @map("due_date")
   status      AssignmentStatus @default(TODO)
   createdAt   DateTime         @default(now()) @map("created_at")
@@ -106,6 +108,8 @@ model TeamAssignment {
   teamId      BigInt           @map("team_id")
   title       String           @db.VarChar(100)
   description String?
+  /// 과제 시작일. 기존 과제의 시작일은 알 수 없으므로 기본값 없이 선택값으로 둔다.
+  startDate   DateTime?        @map("start_date")
   dueDate     DateTime?        @map("due_date")
   status      AssignmentStatus @default(TODO)
   createdAt   DateTime         @default(now()) @map("created_at")
