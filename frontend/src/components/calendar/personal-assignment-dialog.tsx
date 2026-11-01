@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  assignmentStatuses,
+  type AssignmentStatus,
+} from "@/lib/assignment-status";
+
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, apiRequest } from "@/lib/api";
@@ -9,7 +14,7 @@ type Task = {
   description: string;
   startDate: string;
   dueDate: string;
-  status: "TODO" | "DONE";
+  status: AssignmentStatus;
 };
 const inputClass =
   "mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900";
@@ -243,19 +248,24 @@ export default function PersonalAssignmentDialog({
                 />
               </label>
             </div>
-            <label className="flex min-h-10 items-center gap-2 text-sm font-medium">
-              <input
-                type="checkbox"
-                checked={task.status === "DONE"}
+            <label className="block text-sm font-medium">
+              과제 상태
+              <select
+                value={task.status}
                 onChange={(event) =>
                   setTask({
                     ...task,
-                    status: event.target.checked ? "DONE" : "TODO",
+                    status: event.target.value as AssignmentStatus,
                   })
                 }
-                className="h-4 w-4"
-              />
-              완료한 과제
+                className={inputClass}
+              >
+                {assignmentStatuses.map(({ value, label }) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
             </label>
             {confirmDelete ? (
               <div className="rounded-lg bg-red-50 p-4">

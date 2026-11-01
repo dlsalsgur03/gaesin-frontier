@@ -484,3 +484,83 @@ test('개인 과제 입력 검증과 미인증 차단', async () => {
       .expect(400);
   }
 });
+
+test('개인 과제 목록은 날짜 제한 없이 본인 과제만 최근 등록순으로 반환한다', async () => {
+  const server = app.getHttpServer();
+  await request(server).get('/assignments').expect(401);
+  const { body, headers } = await request(server)
+    .get('/assignments')
+    .set('Cookie', cookie)
+    .expect(200);
+  assert.equal(headers['cache-control'], 'private, no-store');
+  const expected = await prisma.assignment.findMany({
+    where: { userId },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+  });
+  assert.deepEqual(
+    body.assignments.map((task) => task.id),
+    expected.map((task) => task.id.toString()),
+  );
+  assert.ok(
+    body.assignments.some(
+      (task) => task.title === '시작일 없음' && task.startDate === '',
+    ),
+  );
+  assert.ok(body.assignments.some((task) => task.title === '기간 이후'));
+  assert.ok(body.assignments.some((task) => task.status === 'DONE'));
+  assert.ok(body.assignments.every((task) => !('userId' in task)));
+  const other = await request(server)
+    .get('/assignments')
+    .set('Cookie', otherCookie)
+    .expect(200);
+  assert.deepEqual(
+    other.body.assignments.map((task) => task.title),
+    ['다른 사람의 비공개 과제'],
+  );
+});
+
+test('등록·진행 중·완료 상태를 저장하고 목록과 캘린더에 반영한다', async () => {
+  const server = app.getHttpServer();
+  const payload = {
+    title: '상태 전환 검증',
+    startDate: '2026-09-30',
+    dueDate: '2026-09-30',
+    status: 'TODO',
+  };
+  const created = await request(server)
+    .post('/assignments')
+    .set('Cookie', cookie)
+    .send(payload)
+    .expect(201);
+  const id = created.body.assignment.id;
+  for (const status of ['IN_PROGRESS', 'DONE', 'TODO']) {
+    await request(server)
+      .put(`/assignments/${id}`)
+      .set('Cookie', cookie)
+      .send({ ...payload, status })
+      .expect(200);
+    const list = await request(server)
+      .get('/assignments')
+      .set('Cookie', cookie)
+      .expect(200);
+    assert.equal(
+      list.body.assignments.find((task) => task.id === id).status,
+      status,
+    );
+    const calendar = await request(server)
+      .get(endpoint)
+      .query(range)
+      .set('Cookie', cookie)
+      .expect(200);
+    assert.equal(
+      calendar.body.assignments.find(
+        (task) => task.kind === 'personal' && task.id === id,
+      ).status,
+      status,
+    );
+  }
+  await request(server)
+    .delete(`/assignments/${id}`)
+    .set('Cookie', cookie)
+    .expect(200);
+});

@@ -40,6 +40,14 @@ export class AssignmentsService {
     };
   }
 
+  async list(userId: string) {
+    const tasks = await this.prisma.assignment.findMany({
+      where: { userId: BigInt(userId) },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+    return { assignments: tasks.map((task) => this.serialize(task)) };
+  }
+
   async get(userId: string, id: string) {
     const task = await this.prisma.assignment.findFirst({
       where: this.where(userId, id),

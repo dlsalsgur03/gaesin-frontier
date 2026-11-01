@@ -7,7 +7,7 @@ type CalendarAssignmentBase = {
   title: string;
   startDate: string;
   dueDate: string;
-  status: 'TODO' | 'DONE';
+  status: 'TODO' | 'IN_PROGRESS' | 'DONE';
 };
 
 export type CalendarAssignment = CalendarAssignmentBase &

@@ -1,0 +1,1 @@
+ALTER TYPE "AssignmentStatus" ADD VALUE 'IN_PROGRESS';

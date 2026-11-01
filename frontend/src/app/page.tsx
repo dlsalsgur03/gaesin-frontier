@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ApiError, apiRequest } from "../lib/api";
-import Calendar from "@/components/calendar/calendar";
+import WorkspaceTabs from "@/components/workspace-tabs";
 
 type User = {
   id: string;
@@ -128,7 +128,7 @@ export default function Home() {
             )}
           </div>
         )}
-        {user && <Calendar />}
+        {user && <WorkspaceTabs />}
       </div>
     </main>
   );

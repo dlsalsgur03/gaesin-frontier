@@ -30,6 +30,6 @@ export class AssignmentDto {
   @IsDateString({ strict: true })
   dueDate: string;
 
-  @IsIn(['TODO', 'DONE'])
-  status: 'TODO' | 'DONE';
+  @IsIn(['TODO', 'IN_PROGRESS', 'DONE'])
+  status: 'TODO' | 'IN_PROGRESS' | 'DONE';
 }
