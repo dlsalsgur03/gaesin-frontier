@@ -1,7 +1,24 @@
-import { statusLabel } from "@/lib/assignment-status";
+import { statusLabel, type AssignmentStatus } from "@/lib/assignment-status";
 import { dateKey } from "@/lib/calendar/dates";
 import { layoutWeekAssignments } from "@/lib/calendar/layout";
 import type { CalendarAssignment } from "@/lib/calendar/types";
+
+/** 종류는 색상(개인 파랑·팀 보라)으로, 상태는 진하기로 구분한다. 진행 중은 채운 막대로 가장 눈에 띄게 한다. */
+const barColor: Record<
+  CalendarAssignment["kind"],
+  Record<AssignmentStatus, string>
+> = {
+  personal: {
+    TODO: "border-blue-200 bg-blue-100 text-blue-950",
+    IN_PROGRESS: "border-blue-700 bg-blue-600 text-white",
+    DONE: "border-blue-100 bg-blue-50 text-blue-800",
+  },
+  team: {
+    TODO: "border-purple-200 bg-purple-100 text-purple-950",
+    IN_PROGRESS: "border-purple-700 bg-purple-600 text-white",
+    DONE: "border-purple-100 bg-purple-50 text-purple-800",
+  },
+};
 
 type CalendarWeekProps = {
   dates: Date[];
@@ -78,17 +95,12 @@ export default function CalendarWeek({
               continuesBefore,
               continuesAfter,
             }) => {
-              const isTeam = assignment.kind === "team";
-              const isDone = assignment.status === "DONE";
-              const label = isTeam ? `팀 · ${assignment.teamName}` : "개인";
+              const label =
+                assignment.kind === "team"
+                  ? `팀 · ${assignment.teamName}`
+                  : "개인";
               const description = `${assignment.title} / ${label} / ${assignment.startDate} ~ ${assignment.dueDate} / ${statusLabel[assignment.status]}`;
-              const color = isTeam
-                ? isDone
-                  ? "border-purple-100 bg-purple-50 text-purple-800"
-                  : "border-purple-200 bg-purple-100 text-purple-950"
-                : isDone
-                  ? "border-blue-100 bg-blue-50 text-blue-800"
-                  : "border-blue-200 bg-blue-100 text-blue-950";
+              const color = barColor[assignment.kind][assignment.status];
 
               return (
                 <li
@@ -112,7 +124,9 @@ export default function CalendarWeek({
                       className="flex items-center gap-1 text-xs font-semibold"
                     >
                       {continuesBefore && <span>‹</span>}
-                      <span className="min-w-0 flex-1 truncate">
+                      <span
+                        className={`min-w-0 flex-1 truncate ${assignment.status === "DONE" ? "line-through" : ""}`}
+                      >
                         {assignment.title}
                       </span>
                       {continuesAfter && <span>›</span>}
