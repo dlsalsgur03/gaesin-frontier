@@ -39,6 +39,7 @@ datasource db {
 
 enum AssignmentStatus {
   TODO
+  IN_PROGRESS
   DONE
 }
 

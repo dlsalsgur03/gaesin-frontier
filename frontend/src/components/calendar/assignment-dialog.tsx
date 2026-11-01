@@ -1,5 +1,6 @@
 "use client";
 
+import { statusLabel, statusClass } from "@/lib/assignment-status";
 import { useEffect, useId, useRef } from "react";
 import type { CalendarAssignment } from "@/lib/calendar/types";
 
@@ -14,7 +15,6 @@ export default function AssignmentDialog({
   const closeRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
   const descriptionId = useId();
-  const isDone = assignment.status === "DONE";
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -96,11 +96,11 @@ export default function AssignmentDialog({
             </dd>
           </div>
           <div>
-            <dt className="font-medium text-zinc-500">완료 상태</dt>
+            <dt className="font-medium text-zinc-500">과제 상태</dt>
             <dd
-              className={`mt-1 inline-flex rounded-md px-2 py-1 font-medium ${isDone ? "bg-zinc-100 text-zinc-600" : "bg-amber-50 text-amber-800"}`}
+              className={`mt-1 inline-flex rounded-md px-2 py-1 font-medium ${statusClass[assignment.status]}`}
             >
-              {isDone ? "완료" : "미완료"}
+              {statusLabel[assignment.status]}
             </dd>
           </div>
           {assignment.kind === "team" && (
