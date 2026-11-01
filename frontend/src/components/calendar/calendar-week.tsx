@@ -124,7 +124,9 @@ export default function CalendarWeek({
                       className="flex items-center gap-1 text-xs font-semibold"
                     >
                       {continuesBefore && <span>‹</span>}
-                      <span className="min-w-0 flex-1 truncate">
+                      <span
+                        className={`min-w-0 flex-1 truncate ${assignment.status === "DONE" ? "line-through" : ""}`}
+                      >
                         {assignment.title}
                       </span>
                       {continuesAfter && <span>›</span>}

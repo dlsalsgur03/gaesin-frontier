@@ -270,7 +270,8 @@ export default function MonthCalendar({
       <p className="border-t border-zinc-200 px-5 py-4 text-sm text-zinc-500 sm:px-7">
         시작일과 마감일이 모두 있는 과제만 표시됩니다. 막대는 양 끝 날짜를 모두
         포함하며, 양 끝의 화살표는 이전·다음 주로 이어지는 과제를 뜻합니다. 진행
-        중인 과제는 진한 막대로, 완료한 과제는 옅은 막대로 표시됩니다.
+        중인 과제는 진한 막대로, 완료한 과제는 옅은 막대에 취소선으로
+        표시됩니다.
       </p>
       {editor && (
         <AssignmentEditorDialog
