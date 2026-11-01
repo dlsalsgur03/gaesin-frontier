@@ -210,7 +210,6 @@ export default function TeamAssignments({
           onClose={() => setCreating(false)}
           onSaved={() => {
             setCreating(false);
-            setFilter("all");
             setNotice("팀 과제를 등록했습니다.");
             setRevision((value) => value + 1);
           }}
