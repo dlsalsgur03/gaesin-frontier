@@ -274,7 +274,7 @@ export default function MonthCalendar({
       {editor && (
         <PersonalAssignmentDialog
           id={editor.id}
-          initialDate={dateKey(month)}
+          initialDate={dateKey(new Date())}
           onClose={() => setEditor(null)}
           onSaved={(date) => {
             setEditor(null);

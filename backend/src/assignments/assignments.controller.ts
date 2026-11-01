@@ -20,6 +20,12 @@ import { AssignmentsService } from './assignments.service';
 export class AssignmentsController {
   constructor(private readonly service: AssignmentsService) {}
 
+  @Get()
+  @Header('Cache-Control', 'private, no-store')
+  list(@Req() req: AuthenticatedRequest) {
+    return this.service.list(req.userId);
+  }
+
   @Get(':id')
   @Header('Cache-Control', 'private, no-store')
   get(@Req() req: AuthenticatedRequest, @Param('id') id: string) {

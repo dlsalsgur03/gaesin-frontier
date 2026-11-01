@@ -1,3 +1,4 @@
+import { statusLabel } from "@/lib/assignment-status";
 import { dateKey } from "@/lib/calendar/dates";
 import { layoutWeekAssignments } from "@/lib/calendar/layout";
 import type { CalendarAssignment } from "@/lib/calendar/types";
@@ -80,7 +81,7 @@ export default function CalendarWeek({
               const isTeam = assignment.kind === "team";
               const isDone = assignment.status === "DONE";
               const label = isTeam ? `팀 · ${assignment.teamName}` : "개인";
-              const description = `${assignment.title} / ${label} / ${assignment.startDate} ~ ${assignment.dueDate} / ${isDone ? "완료" : "미완료"}`;
+              const description = `${assignment.title} / ${label} / ${assignment.startDate} ~ ${assignment.dueDate} / ${statusLabel[assignment.status]}`;
               const color = isTeam
                 ? isDone
                   ? "border-purple-100 bg-purple-50 text-purple-800"
@@ -121,7 +122,7 @@ export default function CalendarWeek({
                       className="mt-0.5 truncate text-[11px]"
                     >
                       {label}
-                      {isDone && " · 완료"}
+                      {` · ${statusLabel[assignment.status]}`}
                     </p>
                   </button>
                 </li>
