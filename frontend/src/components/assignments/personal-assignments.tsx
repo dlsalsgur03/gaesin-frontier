@@ -204,7 +204,6 @@ export default function PersonalAssignments() {
           onClose={() => setEditor(null)}
           onSaved={(date) => {
             setEditor(null);
-            setFilter("all");
             setNotice(date ? "과제를 저장했습니다." : "과제를 삭제했습니다.");
             setRevision((value) => value + 1);
           }}
