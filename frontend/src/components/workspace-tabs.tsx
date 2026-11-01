@@ -3,10 +3,12 @@
 import { useState } from "react";
 import Calendar from "./calendar/calendar";
 import PersonalAssignments from "./assignments/personal-assignments";
+import Teams from "./teams/teams";
 
 const tabs = [
   { id: "calendar", label: "캘린더" },
   { id: "personal", label: "개인 과제" },
+  { id: "teams", label: "팀" },
 ] as const;
 
 export default function WorkspaceTabs() {
@@ -61,7 +63,13 @@ export default function WorkspaceTabs() {
           hidden={active !== tab.id}
         >
           {active === tab.id &&
-            (tab.id === "calendar" ? <Calendar /> : <PersonalAssignments />)}
+            (tab.id === "calendar" ? (
+              <Calendar />
+            ) : tab.id === "personal" ? (
+              <PersonalAssignments />
+            ) : (
+              <Teams />
+            ))}
         </div>
       ))}
     </div>
