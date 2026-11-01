@@ -9,8 +9,7 @@ import {
 } from "@/lib/calendar/dates";
 import type { CalendarAssignment } from "@/lib/calendar/types";
 import CalendarWeek from "./calendar-week";
-import AssignmentDialog from "./assignment-dialog";
-import PersonalAssignmentDialog from "./personal-assignment-dialog";
+import AssignmentEditorDialog from "./assignment-editor-dialog";
 
 const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
 const filters = [
@@ -39,9 +38,11 @@ export default function MonthCalendar({
   const [today, setToday] = useState(() => new Date());
   const [filter, setFilter] =
     useState<(typeof filters)[number]["value"]>("all");
-  const [editor, setEditor] = useState<{ id?: string } | null>(null);
+  const [editor, setEditor] = useState<{
+    id?: string;
+    team?: { id: string; name: string };
+  } | null>(null);
   const [notice, setNotice] = useState("");
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const monthLabel = `${month.getFullYear()}년 ${month.getMonth() + 1}월`;
   const todayKey = dateKey(today);
   const weeks = getMonthWeeks(month);
@@ -54,17 +55,16 @@ export default function MonthCalendar({
       assignment.startDate <= lastDate &&
       assignment.dueDate >= firstDate,
   );
-  // 선택된 과제도 최신 props에서 찾으므로 API 갱신 시 팝업에 변경 사항이 반영된다.
-  const selectedAssignment = assignments.find(
-    (assignment) => `${assignment.kind}:${assignment.id}` === selectedKey,
-  );
-
+  // 팀 과제도 모든 팀원이 수정할 수 있으므로 같은 편집 창을 연다.
   function handleSelectAssignment(assignment: CalendarAssignment) {
-    if (assignment.kind === "personal") {
-      setEditor({ id: assignment.id });
-      return;
-    }
-    setSelectedKey(`${assignment.kind}:${assignment.id}`);
+    setEditor(
+      assignment.kind === "personal"
+        ? { id: assignment.id }
+        : {
+            id: assignment.id,
+            team: { id: assignment.teamId, name: assignment.teamName },
+          },
+    );
   }
 
   useEffect(() => {
@@ -272,8 +272,9 @@ export default function MonthCalendar({
         포함하며, 양 끝의 화살표는 이전·다음 주로 이어지는 과제를 뜻합니다.
       </p>
       {editor && (
-        <PersonalAssignmentDialog
+        <AssignmentEditorDialog
           id={editor.id}
+          team={editor.team}
           initialDate={dateKey(new Date())}
           onClose={() => setEditor(null)}
           onSaved={(date) => {
@@ -282,16 +283,12 @@ export default function MonthCalendar({
             if (date) {
               const [year, monthIndex] = date.split("-").map(Number);
               onMonthChange(new Date(year, monthIndex - 1, 1));
-              if (filter === "team") setFilter("personal");
+              // 저장한 과제가 현재 필터에 가려지지 않게 한다.
+              const kind = editor.team ? "team" : "personal";
+              if (filter !== "all" && filter !== kind) setFilter(kind);
             }
             onReload();
           }}
-        />
-      )}
-      {selectedAssignment && (
-        <AssignmentDialog
-          assignment={selectedAssignment}
-          onClose={() => setSelectedKey(null)}
         />
       )}
     </section>

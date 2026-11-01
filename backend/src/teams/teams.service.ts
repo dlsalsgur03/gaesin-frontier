@@ -8,6 +8,7 @@ import {
 import { randomInt } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '../generated/prisma/client';
+import { parseId } from '../common/parse-id';
 
 // 혼동하기 쉬운 0/O, 1/I/L을 제외한다.
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -20,12 +21,6 @@ const isUniqueViolation = (error: unknown) =>
 @Injectable()
 export class TeamsService {
   constructor(private readonly prisma: PrismaService) {}
-
-  private parseId(value: string, message: string) {
-    if (!/^[1-9]\d{0,18}$/.test(value) || BigInt(value) > 9223372036854775807n)
-      throw new BadRequestException(message);
-    return BigInt(value);
-  }
 
   private inviteCode() {
     let code = '';
@@ -47,7 +42,7 @@ export class TeamsService {
 
   /** 멤버가 아니면 팀의 존재 여부를 드러내지 않도록 404로 응답한다. */
   private async team(userId: string, id: string, ownerOnly = false) {
-    const teamId = this.parseId(id, '유효하지 않은 팀 ID입니다.');
+    const teamId = parseId(id, '유효하지 않은 팀 ID입니다.');
     const team = await this.prisma.team.findFirst({
       where: { id: teamId, team_members: { some: { userId: BigInt(userId) } } },
     });
@@ -160,7 +155,7 @@ export class TeamsService {
 
   async transfer(userId: string, id: string, targetId: string) {
     const team = await this.team(userId, id, true);
-    const target = this.parseId(targetId, '유효하지 않은 사용자 ID입니다.');
+    const target = parseId(targetId, '유효하지 않은 사용자 ID입니다.');
     if (target === team.ownerId)
       throw new BadRequestException('이미 팀 소유자입니다.');
     await this.prisma.$transaction(async (tx) => {
@@ -189,23 +184,33 @@ export class TeamsService {
       throw new BadRequestException(
         '팀 소유자는 소유권을 다른 멤버에게 넘긴 뒤 탈퇴할 수 있습니다.',
       );
-    await this.prisma.teamMember.deleteMany({
-      where: { teamId: team.id, userId: BigInt(userId), role: 'MEMBER' },
-    });
+    await this.removeMembership(team.id, BigInt(userId));
     return { message: '팀에서 탈퇴했습니다.' };
   }
 
   async removeMember(userId: string, id: string, memberId: string) {
     const team = await this.team(userId, id, true);
-    const target = this.parseId(memberId, '유효하지 않은 사용자 ID입니다.');
+    const target = parseId(memberId, '유효하지 않은 사용자 ID입니다.');
     if (target === team.ownerId)
       throw new BadRequestException('팀 소유자는 내보낼 수 없습니다.');
-    const result = await this.prisma.teamMember.deleteMany({
-      where: { teamId: team.id, userId: target, role: 'MEMBER' },
-    });
-    if (!result.count)
+    if (!(await this.removeMembership(team.id, target)))
       throw new NotFoundException('팀 멤버를 찾을 수 없습니다.');
     return this.detail(userId, team.id);
+  }
+
+  /** 팀을 떠난 사용자가 맡던 할 일은 미배정으로 돌린다. 소유자 멤버십은 지우지 않는다. */
+  private async removeMembership(teamId: bigint, userId: bigint) {
+    return this.prisma.$transaction(async (tx) => {
+      const removed = await tx.teamMember.deleteMany({
+        where: { teamId, userId, role: 'MEMBER' },
+      });
+      if (removed.count)
+        await tx.task.updateMany({
+          where: { assigneeId: userId, teamAssignment: { teamId } },
+          data: { assigneeId: null },
+        });
+      return removed.count;
+    });
   }
 
   async remove(userId: string, id: string) {

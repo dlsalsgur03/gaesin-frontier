@@ -4,6 +4,13 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, apiRequest } from "@/lib/api";
 import { roleLabel, type TeamDetail, type TeamMember } from "@/lib/teams";
+import TeamAssignments from "./team-assignments";
+
+/** 팀룸의 하위 화면. 일정·파일·채팅은 이후 여기에 추가한다. */
+const sections = [
+  { id: "assignments", label: "과제" },
+  { id: "info", label: "팀 정보" },
+] as const;
 
 const inputClass =
   "min-h-10 w-full min-w-0 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900";
@@ -80,6 +87,8 @@ export default function TeamDetailPanel({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [confirm, setConfirm] = useState<Confirm | null>(null);
+  const [section, setSection] =
+    useState<(typeof sections)[number]["id"]>("assignments");
   const current = result?.revision === revision ? result : null;
   const team = current?.team;
   const isOwner = team?.myRole === "OWNER";
@@ -216,242 +225,275 @@ export default function TeamDetailPanel({
         </button>
       </div>
 
-      <div className="space-y-6 p-5 sm:p-7">
-        {error && (
-          <p
-            role="alert"
-            className="rounded-lg bg-red-50 p-3 text-sm text-red-700"
+      <nav
+        aria-label="팀룸 메뉴"
+        className="flex gap-1 border-b border-zinc-200 px-5 sm:px-7"
+      >
+        {sections.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            aria-current={section === item.id ? "page" : undefined}
+            onClick={() => setSection(item.id)}
+            className={`min-h-11 border-b-2 px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-blue-600 ${section === item.id ? "border-blue-600 text-blue-700" : "border-transparent text-zinc-500 hover:text-zinc-900"}`}
           >
-            {error}
-          </p>
-        )}
-        {notice && (
-          <p role="status" className="text-sm text-blue-700">
-            {notice}
-          </p>
-        )}
+            {item.label}
+          </button>
+        ))}
+      </nav>
 
-        <div className="space-y-3">
-          <h3 className="font-semibold">초대 코드</h3>
-          <div className="flex flex-wrap items-center gap-2">
-            <code className="rounded-lg bg-zinc-100 px-3 py-2 font-mono text-lg tracking-widest select-all">
-              {team.inviteCode}
-            </code>
-            <button
-              type="button"
-              className={buttonClass}
-              onClick={() => void copyInviteCode(team.inviteCode)}
+      {section === "assignments" ? (
+        <div className="p-5 sm:p-7">
+          <TeamAssignments
+            team={{ id: team.id, name: team.name }}
+            members={team.members}
+          />
+        </div>
+      ) : (
+        <div className="space-y-6 p-5 sm:p-7">
+          {error && (
+            <p
+              role="alert"
+              className="rounded-lg bg-red-50 p-3 text-sm text-red-700"
             >
-              복사
-            </button>
-            {isOwner && (
+              {error}
+            </p>
+          )}
+          {notice && (
+            <p role="status" className="text-sm text-blue-700">
+              {notice}
+            </p>
+          )}
+
+          <div className="space-y-3">
+            <h3 className="font-semibold">초대 코드</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="rounded-lg bg-zinc-100 px-3 py-2 font-mono text-lg tracking-widest select-all">
+                {team.inviteCode}
+              </code>
               <button
                 type="button"
                 className={buttonClass}
-                disabled={busy}
-                onClick={() => setConfirm({ kind: "regenerate" })}
+                onClick={() => void copyInviteCode(team.inviteCode)}
               >
-                재발급
+                복사
+              </button>
+              {isOwner && (
+                <button
+                  type="button"
+                  className={buttonClass}
+                  disabled={busy}
+                  onClick={() => setConfirm({ kind: "regenerate" })}
+                >
+                  재발급
+                </button>
+              )}
+            </div>
+            <p className="text-sm text-zinc-500">
+              이 코드를 받은 사람은 팀에 참여할 수 있습니다.
+            </p>
+            {confirm?.kind === "regenerate" && (
+              <ConfirmBox
+                message="새 코드를 발급하면 지금 코드로는 더 이상 참여할 수 없습니다."
+                action="재발급"
+                busy={busy}
+                onCancel={() => setConfirm(null)}
+                onConfirm={() =>
+                  void run(
+                    `/teams/${id}/invite-code`,
+                    { method: "POST" },
+                    "초대 코드를 재발급했습니다.",
+                  )
+                }
+              />
+            )}
+          </div>
+
+          {isOwner && (
+            <form
+              className="space-y-1"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!name.trim()) return setError("팀 이름을 입력해주세요.");
+                void run(
+                  `/teams/${id}`,
+                  {
+                    method: "PUT",
+                    body: JSON.stringify({ name: name.trim() }),
+                  },
+                  "팀 이름을 바꿨습니다.",
+                );
+              }}
+            >
+              <label htmlFor={nameId} className="block font-semibold">
+                팀 이름
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id={nameId}
+                  value={name}
+                  maxLength={100}
+                  disabled={busy}
+                  onChange={(event) => setName(event.target.value)}
+                  className={inputClass}
+                />
+                <button
+                  type="submit"
+                  disabled={busy || name.trim() === team.name}
+                  className={buttonClass}
+                >
+                  저장
+                </button>
+              </div>
+            </form>
+          )}
+
+          <div className="space-y-2">
+            <h3 className="font-semibold">멤버</h3>
+            <ul className="divide-y divide-zinc-100">
+              {team.members.map((member) => (
+                <li key={member.userId} className="space-y-3 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="break-words font-medium text-zinc-900">
+                        {member.nickname}
+                        {member.isMe && (
+                          <span className="ml-1 text-sm text-zinc-500">
+                            (나)
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-sm text-zinc-500">
+                        {roleLabel[member.role]} ·{" "}
+                        {new Date(member.joinedAt).toLocaleDateString("ko-KR")}{" "}
+                        참여
+                      </p>
+                    </div>
+                    {isOwner && member.role === "MEMBER" && (
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          className={buttonClass}
+                          aria-label={`${member.nickname}에게 소유권 넘기기`}
+                          onClick={() =>
+                            setConfirm({ kind: "transfer", member })
+                          }
+                        >
+                          소유권 넘기기
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          className={`${buttonClass} text-red-700`}
+                          aria-label={`${member.nickname} 내보내기`}
+                          onClick={() => setConfirm({ kind: "remove", member })}
+                        >
+                          내보내기
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {confirm?.kind === "transfer" &&
+                    confirm.member.userId === member.userId && (
+                      <ConfirmBox
+                        message={`${member.nickname}님에게 소유권을 넘길까요? 넘긴 뒤에는 일반 멤버가 됩니다.`}
+                        action="소유권 넘기기"
+                        busy={busy}
+                        onCancel={() => setConfirm(null)}
+                        onConfirm={() =>
+                          void run(
+                            `/teams/${id}/transfer`,
+                            {
+                              method: "POST",
+                              body: JSON.stringify({ userId: member.userId }),
+                            },
+                            `${member.nickname}님에게 소유권을 넘겼습니다.`,
+                          )
+                        }
+                      />
+                    )}
+                  {confirm?.kind === "remove" &&
+                    confirm.member.userId === member.userId && (
+                      <ConfirmBox
+                        message={`${member.nickname}님을 팀에서 내보낼까요?`}
+                        action="내보내기"
+                        busy={busy}
+                        onCancel={() => setConfirm(null)}
+                        onConfirm={() =>
+                          void run(
+                            `/teams/${id}/members/${member.userId}`,
+                            { method: "DELETE" },
+                            `${member.nickname}님을 내보냈습니다.`,
+                          )
+                        }
+                      />
+                    )}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="space-y-3 border-t border-zinc-100 pt-5">
+            {isOwner ? (
+              <>
+                <p className="text-sm text-zinc-500">
+                  팀을 나가려면 먼저 다른 멤버에게 소유권을 넘겨주세요.
+                </p>
+                {confirm?.kind === "delete" ? (
+                  <ConfirmBox
+                    message="팀을 삭제할까요? 팀 과제·세부 작업·일정·메시지·파일 기록이 모두 삭제되며 되돌릴 수 없습니다."
+                    action="팀 삭제"
+                    busy={busy}
+                    onCancel={() => setConfirm(null)}
+                    onConfirm={() =>
+                      void run(
+                        `/teams/${id}`,
+                        { method: "DELETE" },
+                        `팀을 삭제했습니다: ${team.name}`,
+                        true,
+                      )
+                    }
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className={`${buttonClass} text-red-700`}
+                    onClick={() => setConfirm({ kind: "delete" })}
+                  >
+                    팀 삭제
+                  </button>
+                )}
+              </>
+            ) : confirm?.kind === "leave" ? (
+              <ConfirmBox
+                message="팀에서 탈퇴할까요? 다시 참여하려면 초대 코드가 필요합니다."
+                action="탈퇴"
+                busy={busy}
+                onCancel={() => setConfirm(null)}
+                onConfirm={() =>
+                  void run(
+                    `/teams/${id}/leave`,
+                    { method: "POST" },
+                    `팀에서 탈퇴했습니다: ${team.name}`,
+                    true,
+                  )
+                }
+              />
+            ) : (
+              <button
+                type="button"
+                disabled={busy}
+                className={`${buttonClass} text-red-700`}
+                onClick={() => setConfirm({ kind: "leave" })}
+              >
+                팀 탈퇴
               </button>
             )}
           </div>
-          <p className="text-sm text-zinc-500">
-            이 코드를 받은 사람은 팀에 참여할 수 있습니다.
-          </p>
-          {confirm?.kind === "regenerate" && (
-            <ConfirmBox
-              message="새 코드를 발급하면 지금 코드로는 더 이상 참여할 수 없습니다."
-              action="재발급"
-              busy={busy}
-              onCancel={() => setConfirm(null)}
-              onConfirm={() =>
-                void run(
-                  `/teams/${id}/invite-code`,
-                  { method: "POST" },
-                  "초대 코드를 재발급했습니다.",
-                )
-              }
-            />
-          )}
         </div>
-
-        {isOwner && (
-          <form
-            className="space-y-1"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (!name.trim()) return setError("팀 이름을 입력해주세요.");
-              void run(
-                `/teams/${id}`,
-                { method: "PUT", body: JSON.stringify({ name: name.trim() }) },
-                "팀 이름을 바꿨습니다.",
-              );
-            }}
-          >
-            <label htmlFor={nameId} className="block font-semibold">
-              팀 이름
-            </label>
-            <div className="flex gap-2">
-              <input
-                id={nameId}
-                value={name}
-                maxLength={100}
-                disabled={busy}
-                onChange={(event) => setName(event.target.value)}
-                className={inputClass}
-              />
-              <button
-                type="submit"
-                disabled={busy || name.trim() === team.name}
-                className={buttonClass}
-              >
-                저장
-              </button>
-            </div>
-          </form>
-        )}
-
-        <div className="space-y-2">
-          <h3 className="font-semibold">멤버</h3>
-          <ul className="divide-y divide-zinc-100">
-            {team.members.map((member) => (
-              <li key={member.userId} className="space-y-3 py-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="break-words font-medium text-zinc-900">
-                      {member.nickname}
-                      {member.isMe && (
-                        <span className="ml-1 text-sm text-zinc-500">(나)</span>
-                      )}
-                    </p>
-                    <p className="text-sm text-zinc-500">
-                      {roleLabel[member.role]} ·{" "}
-                      {new Date(member.joinedAt).toLocaleDateString("ko-KR")}{" "}
-                      참여
-                    </p>
-                  </div>
-                  {isOwner && member.role === "MEMBER" && (
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        disabled={busy}
-                        className={buttonClass}
-                        aria-label={`${member.nickname}에게 소유권 넘기기`}
-                        onClick={() => setConfirm({ kind: "transfer", member })}
-                      >
-                        소유권 넘기기
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        className={`${buttonClass} text-red-700`}
-                        aria-label={`${member.nickname} 내보내기`}
-                        onClick={() => setConfirm({ kind: "remove", member })}
-                      >
-                        내보내기
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {confirm?.kind === "transfer" &&
-                  confirm.member.userId === member.userId && (
-                    <ConfirmBox
-                      message={`${member.nickname}님에게 소유권을 넘길까요? 넘긴 뒤에는 일반 멤버가 됩니다.`}
-                      action="소유권 넘기기"
-                      busy={busy}
-                      onCancel={() => setConfirm(null)}
-                      onConfirm={() =>
-                        void run(
-                          `/teams/${id}/transfer`,
-                          {
-                            method: "POST",
-                            body: JSON.stringify({ userId: member.userId }),
-                          },
-                          `${member.nickname}님에게 소유권을 넘겼습니다.`,
-                        )
-                      }
-                    />
-                  )}
-                {confirm?.kind === "remove" &&
-                  confirm.member.userId === member.userId && (
-                    <ConfirmBox
-                      message={`${member.nickname}님을 팀에서 내보낼까요?`}
-                      action="내보내기"
-                      busy={busy}
-                      onCancel={() => setConfirm(null)}
-                      onConfirm={() =>
-                        void run(
-                          `/teams/${id}/members/${member.userId}`,
-                          { method: "DELETE" },
-                          `${member.nickname}님을 내보냈습니다.`,
-                        )
-                      }
-                    />
-                  )}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="space-y-3 border-t border-zinc-100 pt-5">
-          {isOwner ? (
-            <>
-              <p className="text-sm text-zinc-500">
-                팀을 나가려면 먼저 다른 멤버에게 소유권을 넘겨주세요.
-              </p>
-              {confirm?.kind === "delete" ? (
-                <ConfirmBox
-                  message="팀을 삭제할까요? 팀 과제·세부 작업·일정·메시지·파일 기록이 모두 삭제되며 되돌릴 수 없습니다."
-                  action="팀 삭제"
-                  busy={busy}
-                  onCancel={() => setConfirm(null)}
-                  onConfirm={() =>
-                    void run(
-                      `/teams/${id}`,
-                      { method: "DELETE" },
-                      `팀을 삭제했습니다: ${team.name}`,
-                      true,
-                    )
-                  }
-                />
-              ) : (
-                <button
-                  type="button"
-                  disabled={busy}
-                  className={`${buttonClass} text-red-700`}
-                  onClick={() => setConfirm({ kind: "delete" })}
-                >
-                  팀 삭제
-                </button>
-              )}
-            </>
-          ) : confirm?.kind === "leave" ? (
-            <ConfirmBox
-              message="팀에서 탈퇴할까요? 다시 참여하려면 초대 코드가 필요합니다."
-              action="탈퇴"
-              busy={busy}
-              onCancel={() => setConfirm(null)}
-              onConfirm={() =>
-                void run(
-                  `/teams/${id}/leave`,
-                  { method: "POST" },
-                  `팀에서 탈퇴했습니다: ${team.name}`,
-                  true,
-                )
-              }
-            />
-          ) : (
-            <button
-              type="button"
-              disabled={busy}
-              className={`${buttonClass} text-red-700`}
-              onClick={() => setConfirm({ kind: "leave" })}
-            >
-              팀 탈퇴
-            </button>
-          )}
-        </div>
-      </div>
+      )}
     </section>
   );
 }
