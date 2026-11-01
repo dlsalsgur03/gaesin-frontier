@@ -6,6 +6,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { TeamsModule } from './teams/teams.module';
+import { TeamAssignmentsModule } from './team-assignments/team-assignments.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { TeamsModule } from './teams/teams.module';
     CalendarModule,
     AssignmentsModule,
     TeamsModule,
+    TeamAssignmentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
