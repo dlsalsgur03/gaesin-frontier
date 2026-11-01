@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, apiRequest } from "@/lib/api";
 import { dateKey } from "@/lib/calendar/dates";
-import PersonalAssignmentDialog from "../calendar/personal-assignment-dialog";
+import AssignmentEditorDialog from "../calendar/assignment-editor-dialog";
 
 type Assignment = {
   id: string;
@@ -198,7 +198,7 @@ export default function PersonalAssignments() {
         )}
       </div>
       {editor && (
-        <PersonalAssignmentDialog
+        <AssignmentEditorDialog
           id={editor.id}
           initialDate={dateKey(new Date())}
           onClose={() => setEditor(null)}

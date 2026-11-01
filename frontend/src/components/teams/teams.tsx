@@ -38,7 +38,10 @@ export default function Teams() {
       signal: controller.signal,
     })
       .then((data) => {
-        if (active) setResult({ revision, teams: data.teams, error: "" });
+        if (!active) return;
+        setResult({ revision, teams: data.teams, error: "" });
+        // 선택한 팀이 없으면(첫 진입, 탈퇴·삭제 직후) 목록 맨 위 팀을 연다.
+        setSelected((id) => id ?? data.teams[0]?.id ?? null);
       })
       .catch((error: unknown) => {
         if (!active) return;
@@ -260,7 +263,7 @@ export default function Teams() {
         />
       ) : (
         <section className="hidden rounded-2xl border border-dashed border-zinc-300 p-7 text-center text-zinc-500 lg:flex lg:items-center lg:justify-center">
-          팀을 선택하면 멤버와 초대 코드를 볼 수 있습니다.
+          팀을 만들거나 초대 코드로 참여하면 여기에 팀룸이 열립니다.
         </section>
       )}
     </div>

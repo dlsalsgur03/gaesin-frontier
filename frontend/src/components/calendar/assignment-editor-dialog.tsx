@@ -21,18 +21,24 @@ const inputClass =
 const buttonClass =
   "min-h-10 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold disabled:opacity-50";
 
-export default function PersonalAssignmentDialog({
+/** 개인 과제와 팀 과제의 등록·수정·삭제 창. team이 있으면 팀 과제 API를 사용한다. */
+export default function AssignmentEditorDialog({
   id,
+  team,
   initialDate,
   onClose,
   onSaved,
 }: {
   id?: string;
+  team?: { id: string; name: string };
   initialDate: string;
   onClose: () => void;
   onSaved: (date?: string) => void;
 }) {
   const router = useRouter();
+  const itemPath = team ? `/team-assignments/${id}` : `/assignments/${id}`;
+  const createPath = team ? `/teams/${team.id}/assignments` : "/assignments";
+  const kindLabel = team ? "팀 과제" : "개인 과제";
   const titleId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const busyRef = useRef(false);
@@ -68,7 +74,7 @@ export default function PersonalAssignmentDialog({
     if (!id) return;
     let active = true;
     const controller = new AbortController();
-    apiRequest<{ assignment: Task }>(`/assignments/${id}`, {
+    apiRequest<{ assignment: Task }>(itemPath, {
       signal: controller.signal,
     })
       .then(({ assignment }) => {
@@ -100,7 +106,7 @@ export default function PersonalAssignmentDialog({
       active = false;
       controller.abort();
     };
-  }, [id, revision, router]);
+  }, [id, itemPath, revision, router]);
 
   async function mutate(remove = false) {
     if (busyRef.current) return;
@@ -116,7 +122,7 @@ export default function PersonalAssignmentDialog({
     busyRef.current = true;
     setBusy(true);
     try {
-      await apiRequest(id ? `/assignments/${id}` : "/assignments", {
+      await apiRequest(id ? itemPath : createPath, {
         method: remove ? "DELETE" : id ? "PUT" : "POST",
         ...(remove
           ? {}
@@ -148,9 +154,14 @@ export default function PersonalAssignmentDialog({
       className="fixed inset-0 m-auto max-h-[calc(100dvh_-_2rem)] w-[calc(100%_-_2rem)] max-w-lg overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-5 text-zinc-900 shadow-xl backdrop:bg-zinc-950/40 sm:p-7"
     >
       <div className="flex items-center justify-between gap-4">
-        <h2 id={titleId} className="text-xl font-bold">
-          {id ? "개인 과제 수정" : "개인 과제 등록"}
-        </h2>
+        <div className="min-w-0">
+          <h2 id={titleId} className="text-xl font-bold">
+            {kindLabel} {id ? "수정" : "등록"}
+          </h2>
+          {team && (
+            <p className="mt-1 truncate text-sm text-zinc-500">{team.name}</p>
+          )}
+        </div>
         <button
           type="button"
           onClick={onClose}
