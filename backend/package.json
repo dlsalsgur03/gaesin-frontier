@@ -15,6 +15,7 @@
     "lint": "oxlint src/ test/",
     "test": "jest",
     "test:calendar": "prisma generate --config prisma7.config.ts && npm run build && node --test test/calendar-api.test.cjs",
+    "test:teams": "prisma generate --config prisma7.config.ts && npm run build && node --test test/teams-api.test.cjs",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
