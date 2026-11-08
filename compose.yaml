@@ -1,10 +1,21 @@
+# 로컬 개발용 구성이다. 배포에 그대로 쓰지 않는다.
+#
+# docker compose up --build     → DB + 마이그레이션 + 백엔드(3001) + 프론트엔드(3000)
+# docker compose up -d db       → DB만(호스트 5433). Node로 직접 개발할 때.
+#
+# .env 없이도 실행된다. DB 계정은 아래 기본값을 쓰고(포트는 이 컴퓨터 안 127.0.0.1에만 열림),
+# JWT_SECRET이 없으면 백엔드가 처음 시작할 때 무작위로 만들어 backend_data 볼륨에 저장한다.
+# 루트 .env에 값을 넣으면 그 값이 우선한다(.env.example 참고).
+
+x-database-url: &database-url postgresql://${POSTGRES_USER:-gaesin}:${POSTGRES_PASSWORD:-gaesin_local}@db:5432/${POSTGRES_DB:-gaesin_frontier}
+
 services:
   db:
     image: postgres:17
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:-gaesin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gaesin_local}
+      POSTGRES_DB: ${POSTGRES_DB:-gaesin_frontier}
     ports:
       - "127.0.0.1:5433:5432"
     volumes:
@@ -18,5 +29,47 @@ services:
       retries: 10
       start_period: 10s
 
+  migrate:
+    build:
+      context: ./backend
+      target: build
+    command: ["npx", "prisma", "migrate", "deploy", "--config", "prisma7.config.ts"]
+    environment:
+      DATABASE_URL: *database-url
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    build:
+      context: ./backend
+      target: runtime
+    environment:
+      DATABASE_URL: *database-url
+      JWT_SECRET: ${JWT_SECRET:-}
+      PORT: "3001"
+      CORS_ORIGIN: http://localhost:3000
+    volumes:
+      - backend_data:/data
+    ports:
+      - "127.0.0.1:3001:3001"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3001
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  backend_data:

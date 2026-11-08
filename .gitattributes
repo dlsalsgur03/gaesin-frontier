@@ -1,0 +1,5 @@
+# 운영체제와 관계없이 저장소에는 LF로 저장한다(Windows에서 fork해도 셸·Docker 파일이 깨지지 않게).
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.svg text
