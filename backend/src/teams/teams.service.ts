@@ -9,6 +9,7 @@ import { randomInt } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import { parseId } from '../common/parse-id';
+import { removeStoredFiles } from '../files/file-storage';
 
 // 혼동하기 쉬운 0/O, 1/I/L을 제외한다.
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -215,12 +216,15 @@ export class TeamsService {
 
   async remove(userId: string, id: string) {
     const team = await this.team(userId, id, true);
-    // 외래 키에 cascade가 없으므로 팀에 딸린 행을 자식부터 지운다.
-    await this.prisma.$transaction(async (tx) => {
+    // 외래 키에 cascade가 없으므로 팀에 딸린 행을 자식부터 지운다. 실제 파일은 커밋 후 지운다.
+    const keys = await this.prisma.$transaction(async (tx) => {
       const teamId = team.id;
-      await tx.file.deleteMany({
-        where: { OR: [{ teamId }, { teamAssignment: { teamId } }] },
+      const fileWhere = { OR: [{ teamId }, { teamAssignment: { teamId } }] };
+      const files = await tx.file.findMany({
+        where: fileWhere,
+        select: { fileUrl: true },
       });
+      await tx.file.deleteMany({ where: fileWhere });
       await tx.task.deleteMany({ where: { teamAssignment: { teamId } } });
       await tx.teamAssignment.deleteMany({ where: { teamId } });
       await tx.schedule.deleteMany({ where: { teamId } });
@@ -231,7 +235,9 @@ export class TeamsService {
       });
       if (!deleted.count)
         throw new ForbiddenException('팀 소유자만 할 수 있습니다.');
+      return files.map((file) => file.fileUrl);
     });
+    await removeStoredFiles(keys);
     return { message: '팀을 삭제했습니다.' };
   }
 }

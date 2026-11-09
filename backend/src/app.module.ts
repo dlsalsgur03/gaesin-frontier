@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { TeamsModule } from './teams/teams.module';
 import { TeamAssignmentsModule } from './team-assignments/team-assignments.module';
+import { FilesModule } from './files/files.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { TeamAssignmentsModule } from './team-assignments/team-assignments.modul
     AssignmentsModule,
     TeamsModule,
     TeamAssignmentsModule,
+    FilesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
