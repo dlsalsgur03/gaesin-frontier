@@ -393,9 +393,9 @@ test('멤버가 팀을 떠나면 맡던 할 일은 미배정이 된다', async (
     .expect(400);
 });
 
-test('팀 과제를 삭제하면 할 일과 첨부파일도 함께 지운다', async () => {
+test('팀 과제를 삭제하면 할 일은 지우고 연결된 팀 파일은 연결만 해제한다', async () => {
   const id = BigInt(assignmentId);
-  await prisma.file.create({
+  const file = await prisma.file.create({
     data: {
       teamId: team.id,
       teamAssignmentId: id,
@@ -410,7 +410,10 @@ test('팀 과제를 삭제하면 할 일과 첨부파일도 함께 지운다', a
   assert.deepEqual(body, { message: '팀 과제를 삭제했습니다.' });
   await as('owner').get(`/team-assignments/${assignmentId}`).expect(404);
   assert.equal(await prisma.task.count({ where: { teamAssignmentId: id } }), 0);
-  assert.equal(await prisma.file.count(), 0);
+  const kept = await prisma.file.findUniqueOrThrow({ where: { id: file.id } });
+  assert.equal(kept.teamId, team.id);
+  assert.equal(kept.teamAssignmentId, null);
+  await prisma.file.delete({ where: { id: file.id } });
   // 다른 팀 과제와 그 할 일은 남는다.
   assert.equal(
     await prisma.task.count({

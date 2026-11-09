@@ -180,10 +180,14 @@ export class TeamAssignmentsService {
 
   async remove(userId: string, id: string) {
     const { id: teamAssignmentId } = await this.assignment(userId, id);
-    // 외래 키에 cascade가 없으므로 첨부파일과 할 일을 먼저 지운다.
+    // 외래 키에 cascade가 없으므로 할 일을 먼저 지운다.
+    // 연결된 팀 파일은 팀 자료이므로 지우지 않고 연결만 해제한다.
     await orNotFound(
       this.prisma.$transaction([
-        this.prisma.file.deleteMany({ where: { teamAssignmentId } }),
+        this.prisma.file.updateMany({
+          where: { teamAssignmentId },
+          data: { teamAssignmentId: null },
+        }),
         this.prisma.task.deleteMany({ where: { teamAssignmentId } }),
         this.prisma.teamAssignment.delete({ where: { id: teamAssignmentId } }),
       ]),
