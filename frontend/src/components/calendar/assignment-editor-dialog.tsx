@@ -8,6 +8,7 @@ import {
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, apiRequest } from "@/lib/api";
+import FilePanel from "../files/file-panel";
 
 type Task = {
   title: string;
@@ -281,7 +282,11 @@ export default function AssignmentEditorDialog({
             {confirmDelete ? (
               <div className="rounded-lg bg-red-50 p-4">
                 <p className="text-sm text-red-800">
-                  이 과제를 삭제할까요? 삭제하면 되돌릴 수 없습니다.
+                  이 과제를 삭제할까요?{" "}
+                  {team
+                    ? "연결된 파일은 팀 파일에 남습니다."
+                    : "첨부파일도 함께 삭제됩니다."}{" "}
+                  삭제하면 되돌릴 수 없습니다.
                 </p>
                 <div className="mt-3 flex gap-2">
                   <button
@@ -321,6 +326,18 @@ export default function AssignmentEditorDialog({
             )}
           </fieldset>
         </form>
+      )}
+      {/* 팀 과제 파일은 팀룸의 파일 탭과 과제 상세에서 관리한다. */}
+      {!team && loaded && (
+        <div className="mt-6 border-t border-zinc-100 pt-5">
+          {id ? (
+            <FilePanel target={{ kind: "assignment", assignmentId: id }} />
+          ) : (
+            <p className="text-sm text-zinc-500">
+              과제를 등록한 뒤 파일을 첨부할 수 있습니다.
+            </p>
+          )}
+        </div>
       )}
     </dialog>
   );
