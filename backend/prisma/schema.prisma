@@ -25,6 +25,8 @@
 //
 // 5. File.team_id는 ERD에서는 NOT NULL이지만,
 //    개인 과제 파일도 저장할 수 있도록 Prisma에서는 nullable로 변경
+//
+// 6. File.size(바이트)를 ERD에 없던 컬럼으로 추가
 // ============================================================
 
 generator client {
@@ -187,7 +189,10 @@ model File {
   teamId           BigInt?  @map("team_id")
   userId           BigInt   @map("user_id")
   fileName         String   @map("file_name") @db.VarChar(255)
+  /// 저장소 안의 파일 키. 경로나 공개 URL이 아니며 응답에 노출하지 않는다.
   fileUrl          String   @map("file_url")
+  /// 바이트 단위 크기
+  size             Int      @default(0)
   createdAt        DateTime @default(now()) @map("created_at")
   assignmentId     BigInt?  @map("assignment_id")
   teamAssignmentId BigInt?  @map("team_assignment_id")
