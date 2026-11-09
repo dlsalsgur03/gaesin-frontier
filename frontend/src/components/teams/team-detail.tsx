@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { ApiError, apiRequest } from "@/lib/api";
 import { roleLabel, type TeamDetail, type TeamMember } from "@/lib/teams";
 import TeamAssignments from "./team-assignments";
+import FilePanel from "../files/file-panel";
 
-/** 팀룸의 하위 화면. 일정·파일·채팅은 이후 여기에 추가한다. */
+/** 팀룸의 하위 화면. 일정·채팅은 이후 여기에 추가한다. */
 const sections = [
   { id: "assignments", label: "과제" },
+  { id: "files", label: "파일" },
   { id: "info", label: "팀 정보" },
 ] as const;
 
@@ -247,6 +249,14 @@ export default function TeamDetailPanel({
           <TeamAssignments
             team={{ id: team.id, name: team.name }}
             members={team.members}
+          />
+        </div>
+      ) : section === "files" ? (
+        <div className="p-5 sm:p-7">
+          <FilePanel
+            key={team.id}
+            target={{ kind: "team", teamId: team.id }}
+            heading="팀 파일"
           />
         </div>
       ) : (

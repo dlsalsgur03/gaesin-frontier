@@ -13,6 +13,7 @@ import { dateKey } from "@/lib/calendar/dates";
 import type { TeamAssignment, TeamMember, TeamTask } from "@/lib/teams";
 import AssignmentEditorDialog from "../calendar/assignment-editor-dialog";
 import TaskDialog from "./task-dialog";
+import FilePanel from "../files/file-panel";
 
 const buttonClass =
   "min-h-10 shrink-0 rounded-lg border border-zinc-200 px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-50";
@@ -309,6 +310,12 @@ export default function TeamAssignmentDetail({
           </ul>
         )}
       </section>
+
+      <FilePanel
+        target={{ kind: "team", teamId: team.id, assignmentId: assignment.id }}
+        heading="연결된 파일"
+        level={4}
+      />
 
       {editing && (
         <AssignmentEditorDialog
