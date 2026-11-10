@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, apiDownload, apiRequest } from "@/lib/api";
 import { fileProblem, formatFileSize, type StoredFile } from "@/lib/files";
+import { useTeamChanged } from "@/lib/realtime";
 
 /**
  * 개인 과제 첨부 또는 팀 파일. 팀 파일에 assignmentId를 주면 그 팀 과제에 연결된 파일만 보이고,
@@ -116,6 +117,15 @@ export default function FilePanel({
       controller.abort();
     };
   }, [listPath, tagMode, teamId, revision, router]);
+
+  // 팀 파일: 다른 팀원이 올리거나 지우면, 과제 목록이 바뀌면(연결할 과제 선택지) 다시 불러온다.
+  // 개인 과제 첨부는 소유자만 보므로 알림이 없다.
+  useTeamChanged(
+    teamId,
+    tagMode ? ["files", "assignments"] : "files",
+    () => setRevision((value) => value + 1),
+    teamId !== null,
+  );
 
   /** 한 번에 하나씩 처리하고, 끝나면 목록을 다시 불러온다. */
   async function run(action: () => Promise<string>, failure: string) {

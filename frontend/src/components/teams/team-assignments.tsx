@@ -11,6 +11,7 @@ import {
 import { dateKey } from "@/lib/calendar/dates";
 import type { TeamAssignment, TeamMember } from "@/lib/teams";
 import AssignmentEditorDialog from "../calendar/assignment-editor-dialog";
+import { useTeamChanged } from "@/lib/realtime";
 import TeamAssignmentDetail from "./team-assignment-detail";
 
 const filters = [
@@ -30,6 +31,8 @@ export default function TeamAssignments({
 }) {
   const router = useRouter();
   const [revision, setRevision] = useState(0);
+  /** 다른 팀원의 변경을 반영하는 조용한 재조회. 지금 목록을 보인 채로 다시 불러온다. */
+  const [quiet, setQuiet] = useState(0);
   const [result, setResult] = useState<{
     revision: number;
     assignments: TeamAssignment[];
@@ -61,20 +64,27 @@ export default function TeamAssignments({
         if (!active) return;
         if (error instanceof ApiError && error.status === 401)
           router.replace("/login");
-        setResult({
-          revision,
-          assignments: [],
-          error:
-            error instanceof Error
-              ? error.message
-              : "팀 과제를 불러오지 못했습니다.",
-        });
+        // 조용한 재조회가 실패하면 지금 목록을 그대로 둔다.
+        setResult((previous) =>
+          previous?.revision === revision && !previous.error
+            ? previous
+            : {
+                revision,
+                assignments: [],
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "팀 과제를 불러오지 못했습니다.",
+              },
+        );
       });
     return () => {
       active = false;
       controller.abort();
     };
-  }, [team.id, revision, router]);
+  }, [team.id, revision, quiet, router]);
+
+  useTeamChanged(team.id, "assignments", () => setQuiet((value) => value + 1));
 
   if (selected)
     return (

@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, apiRequest } from "@/lib/api";
 import { roleLabel, type TeamDetail, type TeamSummary } from "@/lib/teams";
+import { useRealtimeEvent, useTeamChanged } from "@/lib/realtime";
 import TeamDetailPanel from "./team-detail";
 
 const inputClass =
@@ -17,6 +18,8 @@ export default function Teams() {
   const nameId = useId();
   const codeId = useId();
   const [revision, setRevision] = useState(0);
+  /** 다른 팀원의 변경을 반영하는 조용한 재조회. 지금 목록을 보인 채로 다시 불러온다. */
+  const [quiet, setQuiet] = useState(0);
   const [result, setResult] = useState<{
     revision: number;
     teams: TeamSummary[];
@@ -47,20 +50,29 @@ export default function Teams() {
         if (!active) return;
         if (error instanceof ApiError && error.status === 401)
           router.replace("/login");
-        setResult({
-          revision,
-          teams: [],
-          error:
-            error instanceof Error
-              ? error.message
-              : "팀 목록을 불러오지 못했습니다.",
-        });
+        // 조용한 재조회가 실패하면 지금 목록을 그대로 둔다.
+        setResult((previous) =>
+          previous?.revision === revision && !previous.error
+            ? previous
+            : {
+                revision,
+                teams: [],
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "팀 목록을 불러오지 못했습니다.",
+              },
+        );
       });
     return () => {
       active = false;
       controller.abort();
     };
-  }, [revision, router]);
+  }, [revision, quiet, router]);
+
+  // 팀 이름·멤버 수가 바뀌었거나 다른 탭에서 참여·탈퇴했을 수 있다.
+  useTeamChanged(null, "team", () => setQuiet((value) => value + 1));
+  useRealtimeEvent("team:removed", () => setQuiet((value) => value + 1));
 
   async function submit(path: string, body: object, done: string) {
     if (busyRef.current) return;
