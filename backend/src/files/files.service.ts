@@ -8,6 +8,7 @@ import { stat } from 'node:fs/promises';
 import { parseId } from '../common/parse-id';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { removeStoredFiles, storagePath } from './file-storage';
 
 /** 저장소 엔진이 디스크에 쓴 업로드 파일 정보 */
@@ -47,7 +48,10 @@ function displayName(name: string) {
  */
 @Injectable()
 export class FilesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtime: RealtimeGateway,
+  ) {}
 
   private serialize(file: FileRow, userId: string) {
     return {
@@ -180,6 +184,7 @@ export class FilesService {
       teamId: team.id,
       teamAssignmentId: await this.teamAssignmentId(team.id, teamAssignmentId),
     });
+    this.realtime.teamChanged(team.id, 'files');
     return { file: this.serialize(file, userId) };
   }
 
@@ -197,6 +202,7 @@ export class FilesService {
       include,
     });
     if (!updated[0]) throw notFound();
+    this.realtime.teamChanged(file.teamId, 'files');
     return { file: this.serialize(updated[0], userId) };
   }
 
@@ -218,6 +224,7 @@ export class FilesService {
     });
     if (!deleted.count) throw notFound();
     await removeStoredFiles([file.fileUrl]);
+    if (file.teamId !== null) this.realtime.teamChanged(file.teamId, 'files');
     return { message: '파일을 삭제했습니다.' };
   }
 }
