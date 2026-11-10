@@ -83,11 +83,11 @@ DB 비밀번호는 DB를 처음 만들 때만 적용되므로, 바꾸려면 `doc
 | 위치 | 명령 |
 | --- | --- |
 | `backend/` | `npm run lint`, `npx tsc --noEmit -p tsconfig.json` |
-| `backend/` | `npm run test:calendar`, `npm run test:teams`, `npm run test:files`, `npm run test:chat` — 로컬 PostgreSQL(`docker compose up -d db`) 필요 |
+| `backend/` | `npm run test:calendar`, `npm run test:teams`, `npm run test:files`, `npm run test:chat`, `npm run test:schedules` — 로컬 PostgreSQL(`docker compose up -d db`) 필요 |
 | `frontend/` | `npm run lint`, `npx tsc --noEmit`, `npm run test:calendar`, `npm run build` |
 
 백엔드 통합 테스트는 `DATABASE_URL`의 로컬 DB에 무작위 스키마를 만들어 쓰고 끝나면 지운다.
 테스트가 `dist/`를 다시 빌드하므로 `npm run start:dev`는 멈춘 뒤 실행한다.
 
-API 계약은 `backend/src/{assignments,calendar,teams,team-assignments,files,chat}/README.md`에,
+API 계약은 `backend/src/{assignments,calendar,teams,team-assignments,files,chat,schedules}/README.md`에,
 실시간 연결(소켓 인증·이벤트)은 `backend/src/realtime/README.md`에 있다.

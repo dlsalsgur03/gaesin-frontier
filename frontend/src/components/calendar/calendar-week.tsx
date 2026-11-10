@@ -2,6 +2,12 @@ import { statusLabel, type AssignmentStatus } from "@/lib/assignment-status";
 import { dateKey } from "@/lib/calendar/dates";
 import { layoutWeekAssignments } from "@/lib/calendar/layout";
 import type { CalendarAssignment } from "@/lib/calendar/types";
+import {
+  formatScheduleRange,
+  formatTime,
+  scheduleCoversDay,
+  type Schedule,
+} from "@/lib/schedules";
 
 /** 종류는 색상(개인 파랑·팀 보라)으로, 상태는 진하기로 구분한다. 진행 중은 채운 막대로 가장 눈에 띄게 한다. */
 const barColor: Record<
@@ -26,7 +32,18 @@ type CalendarWeekProps = {
   todayKey: string;
   assignments: readonly CalendarAssignment[];
   onSelectAssignment: (assignment: CalendarAssignment) => void;
+  schedules: readonly Schedule[];
+  onSelectSchedule: (schedule: Schedule) => void;
 };
+
+/** 날짜 칸에 보일 시각. 여러 날에 걸치면 시작일은 시작 시각, 마지막 날은 종료 시각, 사이는 종일이다. */
+function dayTimeLabel(schedule: Schedule, key: string) {
+  if (dateKey(new Date(schedule.startAt)) === key)
+    return formatTime(schedule.startAt);
+  if (dateKey(new Date(schedule.endAt)) === key)
+    return `~${formatTime(schedule.endAt)}`;
+  return "종일";
+}
 
 export default function CalendarWeek({
   dates,
@@ -34,6 +51,8 @@ export default function CalendarWeek({
   todayKey,
   assignments,
   onSelectAssignment,
+  schedules,
+  onSelectSchedule,
 }: CalendarWeekProps) {
   const { segments } = layoutWeekAssignments(assignments, dates.map(dateKey));
 
@@ -144,6 +163,59 @@ export default function CalendarWeek({
             },
           )}
         </ul>
+      )}
+      {dates.some((date) =>
+        schedules.some((item) => scheduleCoversDay(item, dateKey(date))),
+      ) && (
+        <div className="relative grid grid-cols-7 pb-3">
+          {dates.map((date) => {
+            const key = dateKey(date);
+            const daySchedules = schedules.filter((item) =>
+              scheduleCoversDay(item, key),
+            );
+            // 빈 날짜에는 목록을 두지 않아 화면 낭독기가 빈 목록을 읽지 않게 한다.
+            if (daySchedules.length === 0) return <div key={key} />;
+            return (
+              <ul
+                key={key}
+                aria-label={`${key} 팀 일정`}
+                className="min-w-0 space-y-0.5 px-1"
+              >
+                {daySchedules.map((schedule) => (
+                  <li key={schedule.id} className="min-w-0">
+                    <button
+                      type="button"
+                      aria-haspopup="dialog"
+                      title={`${schedule.title} / ${schedule.teamName} / ${formatScheduleRange(schedule)}`}
+                      aria-label={`${schedule.teamName} 팀 일정 ${schedule.title}, ${formatScheduleRange(schedule)}`}
+                      onClick={() => onSelectSchedule(schedule)}
+                      className="block min-h-9 w-full min-w-0 rounded px-1 py-0.5 text-left text-[11px] leading-tight hover:bg-orange-50 focus-visible:outline-2 focus-visible:outline-blue-600"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="flex min-w-0 items-center gap-1"
+                      >
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-orange-500" />
+                        <span className="shrink-0 tabular-nums text-zinc-500">
+                          {dayTimeLabel(schedule, key)}
+                        </span>
+                        <span className="min-w-0 truncate font-medium text-zinc-900">
+                          {schedule.title}
+                        </span>
+                      </span>
+                      <span
+                        aria-hidden="true"
+                        className="block truncate pl-2.5 text-zinc-500"
+                      >
+                        {schedule.teamName}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            );
+          })}
+        </div>
       )}
     </section>
   );

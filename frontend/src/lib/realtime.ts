@@ -11,13 +11,13 @@ import type { ChatMessage } from "./chat";
  * 클라이언트가 보내는 이벤트는 없고 서버 알림만 받는다.
  */
 /** team:changed가 알리는 변경 범위 */
-export type TeamChangeScope = "team" | "assignments" | "files";
+export type TeamChangeScope = "team" | "assignments" | "files" | "schedules";
 
 export type RealtimeEvents = {
   /** 연결(재연결 포함)될 때마다. 끊긴 동안 놓친 내용을 다시 불러오는 데 쓴다. */
   connect: () => void;
   "message:new": (message: ChatMessage) => void;
-  /** 팀원(나 포함)이 팀 정보·과제·파일을 바꿨다. 내용 없이 범위만 오며 화면이 다시 불러온다. */
+  /** 팀원(나 포함)이 팀 정보·과제·파일·일정을 바꿨다. 내용 없이 범위만 오며 화면이 다시 불러온다. */
   "team:changed": (payload: {
     teamId: string;
     scopes: TeamChangeScope[];

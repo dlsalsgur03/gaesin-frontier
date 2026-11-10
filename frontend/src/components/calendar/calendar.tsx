@@ -6,6 +6,7 @@ import { ApiError, apiRequest } from "@/lib/api";
 import { dateKey, getMonthWeeks, startOfMonth } from "@/lib/calendar/dates";
 import type { CalendarAssignment } from "@/lib/calendar/types";
 import { useRealtimeEvent, useTeamChanged } from "@/lib/realtime";
+import type { Schedule } from "@/lib/schedules";
 import MonthCalendar from "./month-calendar";
 
 export default function Calendar() {
@@ -17,6 +18,7 @@ export default function Calendar() {
   const [result, setResult] = useState<{
     key: string;
     assignments: CalendarAssignment[];
+    schedules: Schedule[];
     error: string;
   } | null>(null);
   const weeks = getMonthWeeks(month);
@@ -28,17 +30,35 @@ export default function Calendar() {
     const controller = new AbortController();
     let active = true;
 
-    async function loadAssignments() {
+    async function loadCalendar() {
       try {
-        const query = new URLSearchParams({ from, to });
-        const data = await apiRequest<{ assignments: CalendarAssignment[] }>(
-          `/calendar/assignments?${query}`,
-          { signal: controller.signal },
-        );
+        // 일정은 시각이 있으므로 화면에 보이는 첫날 0시부터 마지막 날 다음 날 0시(브라우저 시간대)까지 조회한다.
+        // 시간대 없는 날짜·시각 문자열은 브라우저 시간대로 해석된다.
+        const firstDay = new Date(`${from}T00:00`);
+        const lastDay = new Date(`${to}T00:00`);
+        const scheduleQuery = new URLSearchParams({
+          from: firstDay.toISOString(),
+          to: new Date(
+            lastDay.getFullYear(),
+            lastDay.getMonth(),
+            lastDay.getDate() + 1,
+          ).toISOString(),
+        });
+        const [assignmentData, scheduleData] = await Promise.all([
+          apiRequest<{ assignments: CalendarAssignment[] }>(
+            `/calendar/assignments?${new URLSearchParams({ from, to })}`,
+            { signal: controller.signal },
+          ),
+          apiRequest<{ schedules: Schedule[] }>(
+            `/calendar/schedules?${scheduleQuery}`,
+            { signal: controller.signal },
+          ),
+        ]);
         if (active)
           setResult({
             key: requestKey,
-            assignments: data.assignments,
+            assignments: assignmentData.assignments,
+            schedules: scheduleData.schedules,
             error: "",
           });
       } catch (error: unknown) {
@@ -52,24 +72,25 @@ export default function Calendar() {
             : {
                 key: requestKey,
                 assignments: [],
+                schedules: [],
                 error:
                   error instanceof Error
                     ? error.message
-                    : "과제 일정을 불러오지 못했습니다.",
+                    : "캘린더를 불러오지 못했습니다.",
               },
         );
       }
     }
 
-    void loadAssignments();
+    void loadCalendar();
     return () => {
       active = false;
       controller.abort();
     };
   }, [from, to, requestKey, quiet, router]);
 
-  // 팀 과제 등록·수정·삭제, 팀 이름 변경, 참여·탈퇴·삭제를 새로고침 없이 반영한다.
-  useTeamChanged(null, ["assignments", "team"], () =>
+  // 팀 과제·일정 변경, 팀 이름 변경, 참여·탈퇴·삭제를 새로고침 없이 반영한다.
+  useTeamChanged(null, ["assignments", "schedules", "team"], () =>
     setQuiet((value) => value + 1),
   );
   useRealtimeEvent("team:removed", () => setQuiet((value) => value + 1));
@@ -82,6 +103,7 @@ export default function Calendar() {
       month={month}
       onMonthChange={setMonth}
       assignments={current?.assignments ?? []}
+      schedules={current?.schedules ?? []}
       isLoading={!current}
       error={current?.error ?? ""}
       onReload={() => setRevision((value) => value + 1)}

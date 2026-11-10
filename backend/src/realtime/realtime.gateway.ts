@@ -21,7 +21,7 @@ type AppSocket = Socket<
 >;
 
 /** team:changed가 알리는 변경 범위. 프론트는 해당 화면만 다시 불러온다. */
-export type TeamChangeScope = 'team' | 'assignments' | 'files';
+export type TeamChangeScope = 'team' | 'assignments' | 'files' | 'schedules';
 
 const userRoom = (userId: bigint | string) => `user:${userId}`;
 const teamRoom = (teamId: bigint | string) => `team:${teamId}`;
