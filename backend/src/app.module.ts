@@ -8,6 +8,7 @@ import { CalendarModule } from './calendar/calendar.module';
 import { TeamsModule } from './teams/teams.module';
 import { TeamAssignmentsModule } from './team-assignments/team-assignments.module';
 import { FilesModule } from './files/files.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { FilesModule } from './files/files.module';
     TeamsModule,
     TeamAssignmentsModule,
     FilesModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],
