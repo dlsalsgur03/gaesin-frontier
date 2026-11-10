@@ -27,6 +27,8 @@
 //    개인 과제 파일도 저장할 수 있도록 Prisma에서는 nullable로 변경
 //
 // 6. File.size(바이트)를 ERD에 없던 컬럼으로 추가
+//
+// 7. 팀 채팅 내역 조회를 위해 Message(team_id, id) 인덱스 추가
 // ============================================================
 
 generator client {
@@ -181,6 +183,7 @@ model Message {
   user User @relation(fields: [userId], references: [id])
   team Team @relation(fields: [teamId], references: [id])
 
+  @@index([teamId, id])
   @@map("messages")
 }
 
