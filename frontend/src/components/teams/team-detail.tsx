@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation";
 import { ApiError, apiRequest } from "@/lib/api";
 import { roleLabel, type TeamDetail, type TeamMember } from "@/lib/teams";
 import TeamAssignments from "./team-assignments";
+import { useRealtimeEvent, useTeamChanged } from "@/lib/realtime";
 import FilePanel from "../files/file-panel";
+import TeamChat from "./team-chat";
 
-/** 팀룸의 하위 화면. 일정·채팅은 이후 여기에 추가한다. */
+/** 팀룸의 하위 화면. 일정은 이후 여기에 추가한다. */
 const sections = [
   { id: "assignments", label: "과제" },
+  { id: "chat", label: "채팅" },
   { id: "files", label: "파일" },
   { id: "info", label: "팀 정보" },
 ] as const;
@@ -76,9 +79,15 @@ export default function TeamDetailPanel({
   const router = useRouter();
   const nameId = useId();
   const busyRef = useRef(false);
+  /** 내가 탈퇴·삭제를 요청한 중이면 소켓 알림 대신 그 요청의 결과 문구를 보여준다. */
+  const leavingRef = useRef(false);
   // 부모가 매 렌더마다 새로 만드는 콜백이 재조회를 일으키지 않도록 ref로 읽는다.
   const onGoneRef = useRef(onGone);
   const [revision, setRevision] = useState(0);
+  /** 다른 팀원의 변경을 반영하는 조용한 재조회. 화면(열린 하위 탭 포함)을 유지한 채 다시 불러온다. */
+  const [quiet, setQuiet] = useState(0);
+  /** 마지막으로 받은 팀 이름. 이름 입력칸을 사용자가 고치는 중이면 덮어쓰지 않는 데 쓴다. */
+  const loadedNameRef = useRef("");
   const [result, setResult] = useState<{
     revision: number;
     team: TeamDetail | null;
@@ -99,6 +108,12 @@ export default function TeamDetailPanel({
     onGoneRef.current = onGone;
   });
 
+  // 다른 곳에서 탈퇴했거나 내보내졌거나 팀이 삭제되면 서버가 알려준다.
+  useRealtimeEvent("team:removed", (payload) => {
+    if (payload.teamId === id && !leavingRef.current)
+      onGoneRef.current("팀을 더 이상 볼 수 없습니다.");
+  });
+
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
@@ -108,29 +123,44 @@ export default function TeamDetailPanel({
       .then((data) => {
         if (!active) return;
         setResult({ revision, team: data.team, error: "" });
-        setName(data.team.name);
+        const previousName = loadedNameRef.current;
+        loadedNameRef.current = data.team.name;
+        setName((value) =>
+          value === "" || value === previousName ? data.team.name : value,
+        );
       })
       .catch((error: unknown) => {
         if (!active) return;
         if (error instanceof ApiError && error.status === 401)
           router.replace("/login");
-        // 다른 곳에서 내보내졌거나 삭제된 팀이다.
-        if (error instanceof ApiError && error.status === 404)
-          return onGoneRef.current("팀을 더 이상 볼 수 없습니다.");
-        setResult({
-          revision,
-          team: null,
-          error:
-            error instanceof Error
-              ? error.message
-              : "팀을 불러오지 못했습니다.",
-        });
+        // 다른 곳에서 내보내졌거나 삭제된 팀이다. 내가 탈퇴·삭제하는 중이면 그 요청이 처리한다.
+        if (error instanceof ApiError && error.status === 404) {
+          if (!leavingRef.current)
+            onGoneRef.current("팀을 더 이상 볼 수 없습니다.");
+          return;
+        }
+        // 조용한 재조회가 실패하면 지금 화면을 그대로 둔다.
+        setResult((previous) =>
+          previous?.revision === revision && previous.team
+            ? previous
+            : {
+                revision,
+                team: null,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "팀을 불러오지 못했습니다.",
+              },
+        );
       });
     return () => {
       active = false;
       controller.abort();
     };
-  }, [id, revision, router]);
+  }, [id, revision, quiet, router]);
+
+  // 팀 이름·멤버·소유자·초대 코드가 바뀌면 화면을 유지한 채 다시 불러온다.
+  useTeamChanged(id, "team", () => setQuiet((value) => value + 1));
 
   async function run(
     path: string,
@@ -140,6 +170,7 @@ export default function TeamDetailPanel({
   ) {
     if (busyRef.current) return;
     busyRef.current = true;
+    leavingRef.current = gone;
     setBusy(true);
     setError("");
     setNotice("");
@@ -149,6 +180,7 @@ export default function TeamDetailPanel({
       if (gone) return onGone(done);
       if (data.team) {
         setResult({ revision, team: data.team, error: "" });
+        loadedNameRef.current = data.team.name;
         setName(data.team.name);
       }
       setNotice(done);
@@ -163,6 +195,7 @@ export default function TeamDetailPanel({
       );
     } finally {
       busyRef.current = false;
+      leavingRef.current = false;
       setBusy(false);
     }
   }
@@ -249,6 +282,14 @@ export default function TeamDetailPanel({
           <TeamAssignments
             team={{ id: team.id, name: team.name }}
             members={team.members}
+          />
+        </div>
+      ) : section === "chat" ? (
+        <div className="p-5 sm:p-7">
+          <TeamChat
+            key={team.id}
+            teamId={team.id}
+            myUserId={team.members.find((member) => member.isMe)?.userId}
           />
         </div>
       ) : section === "files" ? (
