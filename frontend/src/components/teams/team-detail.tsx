@@ -8,10 +8,12 @@ import TeamAssignments from "./team-assignments";
 import { useRealtimeEvent, useTeamChanged } from "@/lib/realtime";
 import FilePanel from "../files/file-panel";
 import TeamChat from "./team-chat";
+import TeamSchedules from "./team-schedules";
 
-/** 팀룸의 하위 화면. 일정은 이후 여기에 추가한다. */
+/** 팀룸의 하위 화면 */
 const sections = [
   { id: "assignments", label: "과제" },
+  { id: "schedules", label: "일정" },
   { id: "chat", label: "채팅" },
   { id: "files", label: "파일" },
   { id: "info", label: "팀 정보" },
@@ -282,6 +284,13 @@ export default function TeamDetailPanel({
           <TeamAssignments
             team={{ id: team.id, name: team.name }}
             members={team.members}
+          />
+        </div>
+      ) : section === "schedules" ? (
+        <div className="p-5 sm:p-7">
+          <TeamSchedules
+            key={team.id}
+            team={{ id: team.id, name: team.name }}
           />
         </div>
       ) : section === "chat" ? (

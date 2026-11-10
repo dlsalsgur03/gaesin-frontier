@@ -8,8 +8,10 @@ import {
   startOfMonth,
 } from "@/lib/calendar/dates";
 import type { CalendarAssignment } from "@/lib/calendar/types";
+import type { Schedule } from "@/lib/schedules";
 import CalendarWeek from "./calendar-week";
 import AssignmentEditorDialog from "./assignment-editor-dialog";
+import ScheduleEditorDialog from "../schedules/schedule-editor-dialog";
 
 const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
 const filters = [
@@ -22,6 +24,7 @@ const buttonClass =
 
 export default function MonthCalendar({
   assignments,
+  schedules,
   month,
   onMonthChange,
   isLoading,
@@ -29,6 +32,7 @@ export default function MonthCalendar({
   onReload,
 }: {
   assignments: readonly CalendarAssignment[];
+  schedules: readonly Schedule[];
   month: Date;
   onMonthChange: (month: Date) => void;
   isLoading: boolean;
@@ -42,6 +46,7 @@ export default function MonthCalendar({
     id?: string;
     team?: { id: string; name: string };
   } | null>(null);
+  const [scheduleEditor, setScheduleEditor] = useState<Schedule | null>(null);
   const [notice, setNotice] = useState("");
   const monthLabel = `${month.getFullYear()}년 ${month.getMonth() + 1}월`;
   const todayKey = dateKey(today);
@@ -55,6 +60,8 @@ export default function MonthCalendar({
       assignment.startDate <= lastDate &&
       assignment.dueDate >= firstDate,
   );
+  // 일정은 팀 일정이므로 전체·팀 필터에서 보인다.
+  const visibleSchedules = filter === "personal" ? [] : schedules;
   // 팀 과제도 모든 팀원이 수정할 수 있으므로 같은 편집 창을 연다.
   function handleSelectAssignment(assignment: CalendarAssignment) {
     setEditor(
@@ -199,6 +206,13 @@ export default function MonthCalendar({
             />
             팀 과제
           </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              aria-hidden="true"
+              className="h-2 w-2 rounded-full bg-orange-500"
+            />
+            팀 일정
+          </span>
         </div>
       </div>
       {notice && (
@@ -227,10 +241,10 @@ export default function MonthCalendar({
           className="px-5 pb-4 text-sm text-zinc-500 sm:px-7"
         >
           {isLoading
-            ? "과제 일정을 불러오고 있습니다."
-            : visibleAssignments.length > 0
-              ? `표시된 과제 ${visibleAssignments.length}개 · 과제를 선택하면 자세한 정보를 볼 수 있습니다.`
-              : "표시할 과제가 없습니다."}
+            ? "과제와 일정을 불러오고 있습니다."
+            : visibleAssignments.length + visibleSchedules.length > 0
+              ? `표시된 과제 ${visibleAssignments.length}개 · 일정 ${visibleSchedules.length}개 · 선택하면 자세한 정보를 볼 수 있습니다.`
+              : "표시할 과제나 일정이 없습니다."}
         </p>
       )}
 
@@ -263,6 +277,11 @@ export default function MonthCalendar({
               todayKey={todayKey}
               assignments={visibleAssignments}
               onSelectAssignment={handleSelectAssignment}
+              schedules={visibleSchedules}
+              onSelectSchedule={(schedule) => {
+                setNotice("");
+                setScheduleEditor(schedule);
+              }}
             />
           ))}
         </div>
@@ -271,8 +290,23 @@ export default function MonthCalendar({
         시작일과 마감일이 모두 있는 과제만 표시됩니다. 막대는 양 끝 날짜를 모두
         포함하며, 양 끝의 화살표는 이전·다음 주로 이어지는 과제를 뜻합니다. 진행
         중인 과제는 진한 막대로, 완료한 과제는 옅은 막대에 취소선으로
-        표시됩니다.
+        표시됩니다. 팀 일정은 날짜 칸 아래에 주황 점으로 시각·제목·팀 이름과
+        함께 표시되며, 일정 등록은 팀룸의 일정 탭에서 합니다.
       </p>
+      {scheduleEditor && (
+        <ScheduleEditorDialog
+          team={{ id: scheduleEditor.teamId, name: scheduleEditor.teamName }}
+          schedule={scheduleEditor}
+          onClose={() => setScheduleEditor(null)}
+          onSaved={(saved) => {
+            setScheduleEditor(null);
+            setNotice(saved ? "일정을 저장했습니다." : "일정을 삭제했습니다.");
+            // 시작 시각을 다른 달로 옮겼다면 그 달을 보여준다.
+            if (saved) onMonthChange(startOfMonth(new Date(saved.startAt)));
+            onReload();
+          }}
+        />
+      )}
       {editor && (
         <AssignmentEditorDialog
           id={editor.id}
