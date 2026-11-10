@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ApiError, apiRequest } from "../lib/api";
+import { disconnectRealtime } from "../lib/realtime";
 import WorkspaceTabs from "@/components/workspace-tabs";
 
 type User = {
@@ -63,6 +64,7 @@ export default function Home() {
         method: "POST",
       });
 
+      disconnectRealtime();
       setUser(null);
       router.replace("/login");
     } catch (error: unknown) {

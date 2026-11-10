@@ -3,6 +3,7 @@ import { parseId } from '../common/parse-id';
 import { PrismaService } from '../prisma/prisma.service';
 import { AssignmentDto, toAssignmentData } from './assignment.dto';
 import type { Assignment } from '../generated/prisma/client';
+import { removeStoredFiles } from '../files/file-storage';
 
 @Injectable()
 export class AssignmentsService {
@@ -58,11 +59,23 @@ export class AssignmentsService {
     return { assignment: this.serialize(tasks[0]) };
   }
 
+  /** 외래 키에 cascade가 없으므로 첨부파일 기록을 먼저 지우고, 커밋 후 실제 파일을 지운다. */
   async remove(userId: string, id: string) {
-    const result = await this.prisma.assignment.deleteMany({
-      where: this.where(userId, id),
+    const where = this.where(userId, id);
+    const keys = await this.prisma.$transaction(async (tx) => {
+      const files = await tx.file.findMany({
+        where: { assignmentId: where.id, assignment: { userId: where.userId } },
+        select: { fileUrl: true },
+      });
+      await tx.file.deleteMany({
+        where: { assignmentId: where.id, assignment: { userId: where.userId } },
+      });
+      const result = await tx.assignment.deleteMany({ where });
+      if (!result.count)
+        throw new NotFoundException('과제를 찾을 수 없습니다.');
+      return files.map((file) => file.fileUrl);
     });
-    if (!result.count) throw new NotFoundException('과제를 찾을 수 없습니다.');
+    await removeStoredFiles(keys);
     return { message: '과제를 삭제했습니다.' };
   }
 }

@@ -7,6 +7,8 @@ import { AuthModule } from './auth/auth.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { TeamsModule } from './teams/teams.module';
 import { TeamAssignmentsModule } from './team-assignments/team-assignments.module';
+import { FilesModule } from './files/files.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -16,6 +18,8 @@ import { TeamAssignmentsModule } from './team-assignments/team-assignments.modul
     AssignmentsModule,
     TeamsModule,
     TeamAssignmentsModule,
+    FilesModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],

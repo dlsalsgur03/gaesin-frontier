@@ -10,7 +10,7 @@
 - `POST /teams/:teamId/assignments`: 등록 (201)
 - `GET /team-assignments/:id`: 상세 (200, private/no-store)
 - `PUT /team-assignments/:id`: 전체 수정 (200)
-- `DELETE /team-assignments/:id`: 삭제 (200). 딸린 할 일과 첨부파일 행도 한 트랜잭션에서 지운다.
+- `DELETE /team-assignments/:id`: 삭제 (200). 딸린 할 일을 한 트랜잭션에서 지우고, 연결된 팀 파일은 연결만 해제한다(`../files/README.md`).
 
 본문은 개인 과제와 같은 `AssignmentDto`(title, description, startDate, dueDate, status)이며 검증 규칙도 같다.
 시작일·마감일은 필수 `YYYY-MM-DD`이고 UTC 자정으로 저장한다. 날짜 변환은 `toAssignmentData`를 공유한다.

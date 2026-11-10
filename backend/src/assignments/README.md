@@ -7,7 +7,7 @@
 - `POST /assignments`: 등록 (201)
 - `GET /assignments/:id`: 상세 조회 (200, private/no-store)
 - `PUT /assignments/:id`: 전체 수정 및 완료 상태 변경 (200)
-- `DELETE /assignments/:id`: 삭제 (200)
+- `DELETE /assignments/:id`: 삭제 (200). 첨부파일 기록과 실제 파일도 함께 지운다(`../files/README.md`).
 
 등록·수정 본문:
 

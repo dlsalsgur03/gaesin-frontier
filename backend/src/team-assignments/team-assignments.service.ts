@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { parseId } from '../common/parse-id';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { AssignmentDto, toAssignmentData } from '../assignments/assignment.dto';
 import { Prisma } from '../generated/prisma/client';
 import type { TeamAssignment, Task } from '../generated/prisma/client';
@@ -33,7 +34,10 @@ async function orNotFound<T>(query: Promise<T>, message: string) {
  */
 @Injectable()
 export class TeamAssignmentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtime: RealtimeGateway,
+  ) {}
 
   private member(userId: string) {
     return { team_members: { some: { userId: BigInt(userId) } } };
@@ -152,6 +156,7 @@ export class TeamAssignmentsService {
       data: { ...toAssignmentData(dto), teamId: team.id },
       include: this.include,
     });
+    this.realtime.teamChanged(team.id, 'assignments');
     return { assignment: this.serialize(assignment) };
   }
 
@@ -166,7 +171,7 @@ export class TeamAssignmentsService {
 
   async update(userId: string, id: string, dto: AssignmentDto) {
     const data = toAssignmentData(dto);
-    const { id: assignmentId } = await this.assignment(userId, id);
+    const { id: assignmentId, teamId } = await this.assignment(userId, id);
     const assignment = await orNotFound(
       this.prisma.teamAssignment.update({
         where: { id: assignmentId },
@@ -175,20 +180,27 @@ export class TeamAssignmentsService {
       }),
       '팀 과제를 찾을 수 없습니다.',
     );
+    this.realtime.teamChanged(teamId, 'assignments');
     return { assignment: this.serialize(assignment) };
   }
 
   async remove(userId: string, id: string) {
-    const { id: teamAssignmentId } = await this.assignment(userId, id);
-    // 외래 키에 cascade가 없으므로 첨부파일과 할 일을 먼저 지운다.
+    const { id: teamAssignmentId, teamId } = await this.assignment(userId, id);
+    // 외래 키에 cascade가 없으므로 할 일을 먼저 지운다.
+    // 연결된 팀 파일은 팀 자료이므로 지우지 않고 연결만 해제한다.
     await orNotFound(
       this.prisma.$transaction([
-        this.prisma.file.deleteMany({ where: { teamAssignmentId } }),
+        this.prisma.file.updateMany({
+          where: { teamAssignmentId },
+          data: { teamAssignmentId: null },
+        }),
         this.prisma.task.deleteMany({ where: { teamAssignmentId } }),
         this.prisma.teamAssignment.delete({ where: { id: teamAssignmentId } }),
       ]),
       '팀 과제를 찾을 수 없습니다.',
     );
+    // 연결이 풀린 파일도 파일 탭에 반영되어야 한다.
+    this.realtime.teamChanged(teamId, 'assignments', 'files');
     return { message: '팀 과제를 삭제했습니다.' };
   }
 
@@ -209,6 +221,7 @@ export class TeamAssignmentsService {
       data: { ...data, teamAssignmentId: assignment.id },
       include: this.taskInclude,
     });
+    this.realtime.teamChanged(assignment.teamId, 'assignments');
     return { task: this.serializeTask(task) };
   }
 
@@ -223,6 +236,7 @@ export class TeamAssignmentsService {
       }),
       '할 일을 찾을 수 없습니다.',
     );
+    this.realtime.teamChanged(current.teamAssignment.teamId, 'assignments');
     return { task: this.serializeTask(task) };
   }
 
@@ -232,6 +246,7 @@ export class TeamAssignmentsService {
       this.prisma.task.delete({ where: { id: task.id } }),
       '할 일을 찾을 수 없습니다.',
     );
+    this.realtime.teamChanged(task.teamAssignment.teamId, 'assignments');
     return { message: '할 일을 삭제했습니다.' };
   }
 }

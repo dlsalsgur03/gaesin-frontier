@@ -9,6 +9,8 @@ import { randomInt } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import { parseId } from '../common/parse-id';
+import { removeStoredFiles } from '../files/file-storage';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 // 혼동하기 쉬운 0/O, 1/I/L을 제외한다.
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -20,7 +22,10 @@ const isUniqueViolation = (error: unknown) =>
 
 @Injectable()
 export class TeamsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtime: RealtimeGateway,
+  ) {}
 
   private inviteCode() {
     let code = '';
@@ -121,12 +126,14 @@ export class TeamsService {
         },
       }),
     );
+    this.realtime.joinTeam(ownerId, team.id);
     return this.detail(userId, team.id);
   }
 
   async rename(userId: string, id: string, name: string) {
     const team = await this.team(userId, id, true);
     await this.prisma.team.update({ where: { id: team.id }, data: { name } });
+    this.realtime.teamChanged(team.id, 'team');
     return this.detail(userId, team.id);
   }
 
@@ -142,6 +149,8 @@ export class TeamsService {
         throw new ConflictException('이미 참여한 팀입니다.');
       throw error;
     }
+    this.realtime.joinTeam(userId, team.id);
+    this.realtime.teamChanged(team.id, 'team');
     return this.detail(userId, team.id);
   }
 
@@ -150,6 +159,7 @@ export class TeamsService {
     await this.withInviteCode((inviteCode) =>
       this.prisma.team.update({ where: { id: team.id }, data: { inviteCode } }),
     );
+    this.realtime.teamChanged(team.id, 'team');
     return this.detail(userId, team.id);
   }
 
@@ -175,6 +185,7 @@ export class TeamsService {
         data: { role: 'MEMBER' },
       });
     });
+    this.realtime.teamChanged(team.id, 'team');
     return this.detail(userId, team.id);
   }
 
@@ -198,9 +209,12 @@ export class TeamsService {
     return this.detail(userId, team.id);
   }
 
-  /** 팀을 떠난 사용자가 맡던 할 일은 미배정으로 돌린다. 소유자 멤버십은 지우지 않는다. */
+  /**
+   * 팀을 떠난 사용자가 맡던 할 일은 미배정으로 돌린다. 소유자 멤버십은 지우지 않는다.
+   * 커밋 뒤 그 사용자의 실시간 연결을 팀 룸에서 뺀다.
+   */
   private async removeMembership(teamId: bigint, userId: bigint) {
-    return this.prisma.$transaction(async (tx) => {
+    const count = await this.prisma.$transaction(async (tx) => {
       const removed = await tx.teamMember.deleteMany({
         where: { teamId, userId, role: 'MEMBER' },
       });
@@ -211,16 +225,25 @@ export class TeamsService {
         });
       return removed.count;
     });
+    if (count) {
+      this.realtime.leaveTeam(userId, teamId);
+      // 멤버 목록과 할 일 담당자(미배정 처리)가 바뀐다.
+      this.realtime.teamChanged(teamId, 'team', 'assignments');
+    }
+    return count;
   }
 
   async remove(userId: string, id: string) {
     const team = await this.team(userId, id, true);
-    // 외래 키에 cascade가 없으므로 팀에 딸린 행을 자식부터 지운다.
-    await this.prisma.$transaction(async (tx) => {
+    // 외래 키에 cascade가 없으므로 팀에 딸린 행을 자식부터 지운다. 실제 파일은 커밋 후 지운다.
+    const keys = await this.prisma.$transaction(async (tx) => {
       const teamId = team.id;
-      await tx.file.deleteMany({
-        where: { OR: [{ teamId }, { teamAssignment: { teamId } }] },
+      const fileWhere = { OR: [{ teamId }, { teamAssignment: { teamId } }] };
+      const files = await tx.file.findMany({
+        where: fileWhere,
+        select: { fileUrl: true },
       });
+      await tx.file.deleteMany({ where: fileWhere });
       await tx.task.deleteMany({ where: { teamAssignment: { teamId } } });
       await tx.teamAssignment.deleteMany({ where: { teamId } });
       await tx.schedule.deleteMany({ where: { teamId } });
@@ -231,7 +254,10 @@ export class TeamsService {
       });
       if (!deleted.count)
         throw new ForbiddenException('팀 소유자만 할 수 있습니다.');
+      return files.map((file) => file.fileUrl);
     });
+    this.realtime.closeTeam(team.id);
+    await removeStoredFiles(keys);
     return { message: '팀을 삭제했습니다.' };
   }
 }

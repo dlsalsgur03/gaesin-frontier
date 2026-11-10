@@ -13,6 +13,8 @@ import { dateKey } from "@/lib/calendar/dates";
 import type { TeamAssignment, TeamMember, TeamTask } from "@/lib/teams";
 import AssignmentEditorDialog from "../calendar/assignment-editor-dialog";
 import TaskDialog from "./task-dialog";
+import FilePanel from "../files/file-panel";
+import { useTeamChanged } from "@/lib/realtime";
 
 const buttonClass =
   "min-h-10 shrink-0 rounded-lg border border-zinc-200 px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-50";
@@ -105,6 +107,12 @@ export default function TeamAssignmentDetail({
       controller.abort();
     };
   }, [id, revision, router]);
+
+  // 다른 팀원이 과제·할 일을 바꾸면 지금 내용을 보인 채로 다시 불러온다.
+  // 내 요청을 처리하는 중이면 그 요청이 끝난 뒤 다시 불러오므로 건너뛴다(삭제 중 404 방지).
+  useTeamChanged(team.id, "assignments", () => {
+    if (!busyRef.current) setRevision((value) => value + 1);
+  });
 
   async function changeStatus(task: TeamTask, status: AssignmentStatus) {
     if (busyRef.current) return;
@@ -309,6 +317,12 @@ export default function TeamAssignmentDetail({
           </ul>
         )}
       </section>
+
+      <FilePanel
+        target={{ kind: "team", teamId: team.id, assignmentId: assignment.id }}
+        heading="연결된 파일"
+        level={4}
+      />
 
       {editing && (
         <AssignmentEditorDialog
