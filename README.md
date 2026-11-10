@@ -7,7 +7,7 @@
 | 영역 | 구성 |
 | --- | --- |
 | 프론트엔드 | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4 — `frontend/` |
-| 백엔드 | NestJS 12, TypeScript, Prisma 7 — `backend/` |
+| 백엔드 | NestJS 12, TypeScript, Prisma 7, Socket.IO 4 — `backend/` |
 | 데이터베이스 | PostgreSQL 17 (Docker) |
 | 인증 | Argon2id, JWT HttpOnly 쿠키 |
 
@@ -32,6 +32,7 @@ http://localhost:3000 에 접속해 회원가입한다.
 - 업로드한 파일도 같은 볼륨(`/data/uploads`)에 저장되어 컨테이너를 다시 만들어도 남는다. `docker compose down -v`로 함께 지워진다.
 - DB 계정은 compose 기본값을 쓴다. DB 포트는 이 컴퓨터 안(`127.0.0.1`)에서만 열린다.
 - 브라우저 주소는 `localhost`를 쓴다. `127.0.0.1:3000`으로 접속하면 CORS·쿠키 규칙에 막힌다.
+  실시간 채팅·알림 연결(Socket.IO)도 백엔드 3001 포트를 함께 쓰며 `CORS_ORIGIN`에 있는 주소에서만 연결된다.
 
 > **로컬 개발용 구성이다.** 서버에 배포할 때는 이 compose를 그대로 쓰지 말고, 루트 `.env`
 > (`.env.example` 참고)로 DB 비밀번호와 `JWT_SECRET`을 직접 지정하고 HTTPS를 갖춘 별도 설정을 쓴다.
@@ -82,10 +83,11 @@ DB 비밀번호는 DB를 처음 만들 때만 적용되므로, 바꾸려면 `doc
 | 위치 | 명령 |
 | --- | --- |
 | `backend/` | `npm run lint`, `npx tsc --noEmit -p tsconfig.json` |
-| `backend/` | `npm run test:calendar`, `npm run test:teams`, `npm run test:files` — 로컬 PostgreSQL(`docker compose up -d db`) 필요 |
+| `backend/` | `npm run test:calendar`, `npm run test:teams`, `npm run test:files`, `npm run test:chat` — 로컬 PostgreSQL(`docker compose up -d db`) 필요 |
 | `frontend/` | `npm run lint`, `npx tsc --noEmit`, `npm run test:calendar`, `npm run build` |
 
 백엔드 통합 테스트는 `DATABASE_URL`의 로컬 DB에 무작위 스키마를 만들어 쓰고 끝나면 지운다.
 테스트가 `dist/`를 다시 빌드하므로 `npm run start:dev`는 멈춘 뒤 실행한다.
 
-API 계약은 `backend/src/{assignments,calendar,teams,team-assignments,files}/README.md`에 있다.
+API 계약은 `backend/src/{assignments,calendar,teams,team-assignments,files,chat}/README.md`에,
+실시간 연결(소켓 인증·이벤트)은 `backend/src/realtime/README.md`에 있다.
