@@ -1,6 +1,6 @@
 require('reflect-metadata');
 require('dotenv/config');
-const { before, after, test } = require('node:test');
+const { before, after, describe, test } = require('node:test');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const { mkdtemp, readdir, readFile, rm } = require('node:fs/promises');
@@ -81,6 +81,8 @@ before(async () => {
     ['owner', '팀장'],
     ['member', '팀원'],
     ['outsider', '외부인'],
+    ['saver', '저장왕'],
+    ['racer', '동시업로더'],
   ]) {
     users[key] = await prisma.user.create({
       data: {
@@ -476,4 +478,119 @@ test('팀을 삭제하면 팀 파일 기록과 실제 파일을 함께 지운다
   await as('owner').delete(`/teams/${team.id}`).expect(200);
   assert.equal(await prisma.file.count({ where: { teamId: team.id } }), 0);
   assert.equal(await storedCount(), before - count);
+});
+
+describe('사용자별 저장 용량 제한', () => {
+  const KB = 1024;
+  let quotaTeam;
+  let saverPersonal;
+  let racerPersonal;
+  let previousQuota;
+  const upload = (key, url, size, name = 'a.bin') =>
+    as(key).post(url).attach('file', Buffer.alloc(size, 7), name);
+
+  before(async () => {
+    previousQuota = process.env.USER_STORAGE_QUOTA_MB;
+    process.env.USER_STORAGE_QUOTA_MB = '1';
+    quotaTeam = await prisma.team.create({
+      data: {
+        name: '용량 팀',
+        inviteCode: 'QUOTATEAM2',
+        ownerId: users.outsider.id,
+        team_members: {
+          create: [
+            { userId: users.outsider.id, role: 'OWNER' },
+            { userId: users.saver.id, role: 'MEMBER' },
+          ],
+        },
+      },
+    });
+    const personalOf = (user) =>
+      prisma.assignment.create({
+        data: {
+          userId: user.id,
+          title: '용량 과제',
+          startDate: at('2026-11-01'),
+          dueDate: at('2026-11-10'),
+        },
+      });
+    saverPersonal = await personalOf(users.saver);
+    racerPersonal = await personalOf(users.racer);
+  });
+
+  after(() => {
+    if (previousQuota === undefined) delete process.env.USER_STORAGE_QUOTA_MB;
+    else process.env.USER_STORAGE_QUOTA_MB = previousQuota;
+  });
+
+  let firstId;
+
+  test('한도를 넘으면 413이고 기록·실제 파일을 남기지 않는다', async () => {
+    const first = await upload(
+      'saver',
+      `/assignments/${saverPersonal.id}/files`,
+      600 * KB,
+    ).expect(201);
+    firstId = first.body.file.id;
+
+    const files = await prisma.file.count();
+    const stored = await storedCount();
+    const res = await upload(
+      'saver',
+      `/assignments/${saverPersonal.id}/files`,
+      600 * KB,
+    ).expect(413);
+    assert.match(
+      res.body.message,
+      /^저장 공간이 부족합니다\. 파일은 한 사람당 1\.0MB까지 올릴 수 있습니다\(지금 0\.6MB 사용 중\)/,
+    );
+    assert.equal(await prisma.file.count(), files);
+    assert.equal(await storedCount(), stored);
+  });
+
+  test('팀 파일도 같은 한도에 함께 센다', async () => {
+    await upload('saver', `/teams/${quotaTeam.id}/files`, 300 * KB).expect(201);
+    // 600KB + 300KB + 200KB > 1MB
+    await upload('saver', `/teams/${quotaTeam.id}/files`, 200 * KB).expect(413);
+  });
+
+  test('다른 사람의 사용량은 내 한도에 들어가지 않는다', async () => {
+    await upload('outsider', `/teams/${quotaTeam.id}/files`, 900 * KB).expect(
+      201,
+    );
+  });
+
+  test('파일을 지우면 그만큼 다시 올릴 수 있다', async () => {
+    await as('saver').delete(`/files/${firstId}`).expect(200);
+    await upload('saver', `/teams/${quotaTeam.id}/files`, 200 * KB).expect(201);
+  });
+
+  test('나간 팀에 남은 파일은 더 이상 세지 않는다', async () => {
+    // 지금 팀 파일 500KB. 팀을 나가면 0이 된다.
+    await upload(
+      'saver',
+      `/assignments/${saverPersonal.id}/files`,
+      600 * KB,
+    ).expect(413);
+    await as('saver').post(`/teams/${quotaTeam.id}/leave`).expect(200);
+    await upload(
+      'saver',
+      `/assignments/${saverPersonal.id}/files`,
+      900 * KB,
+    ).expect(201);
+  });
+
+  test('동시에 올려도 한도를 넘지 않는다', async () => {
+    const url = `/assignments/${racerPersonal.id}/files`;
+    const results = await Promise.all(
+      [1, 2, 3].map((n) => upload('racer', url, 600 * KB, `r${n}.bin`)),
+    );
+    const statuses = results.map((res) => res.status).sort();
+    assert.deepEqual(statuses, [201, 413, 413]);
+    const { _sum } = await prisma.file.aggregate({
+      _sum: { size: true },
+      where: { userId: users.racer.id },
+    });
+    assert.equal(_sum.size, 600 * KB);
+  });
 });

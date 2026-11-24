@@ -72,7 +72,7 @@ Docker로 전체를 실행 중이면 3000·3001 포트가 겹치므로 `docker c
 | 파일 | 필요할 때 | 값 |
 | --- | --- | --- |
 | `.env` (선택) | Docker 기본값을 바꿀 때 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `JWT_SECRET` |
-| `backend/.env` | 백엔드를 Node로 직접 실행 | `DATABASE_URL`(localhost:5433), `JWT_SECRET`, `PORT`, `CORS_ORIGIN`, `UPLOAD_DIR`(선택, 기본 `backend/uploads`), `TRUST_PROXY`(선택, 프록시 뒤 배포 시) |
+| `backend/.env` | 백엔드를 Node로 직접 실행 | `DATABASE_URL`(localhost:5433), `JWT_SECRET`, `PORT`, `CORS_ORIGIN`, `UPLOAD_DIR`(선택, 기본 `backend/uploads`), `USER_STORAGE_QUOTA_MB`(선택, 기본 200), `TRUST_PROXY`(선택, 프록시 뒤 배포 시) |
 | `frontend/.env.local` | 프론트엔드를 Node로 직접 실행 | `NEXT_PUBLIC_API_URL`(기본 `http://localhost:3001`) |
 
 `node scripts/setup-env.mjs`는 `backend/.env`와 `frontend/.env.local`을 만들고, 이미 있는 파일은 건드리지 않는다.

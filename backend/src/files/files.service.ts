@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -9,7 +11,11 @@ import { parseId } from '../common/parse-id';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
-import { removeStoredFiles, storagePath } from './file-storage';
+import {
+  removeStoredFiles,
+  storagePath,
+  userStorageQuota,
+} from './file-storage';
 
 /** 저장소 엔진이 디스크에 쓴 업로드 파일 정보 */
 export type StoredUpload = {
@@ -20,6 +26,37 @@ export type StoredUpload = {
 };
 
 const notFound = () => new NotFoundException('파일을 찾을 수 없습니다.');
+
+const toMb = (bytes: number) => {
+  const mb = bytes / 1024 / 1024;
+  return mb >= 10 ? Math.round(mb).toString() : mb.toFixed(1);
+};
+
+/**
+ * 사용자별 저장 용량 초과(413). 컨트롤러의 FileTooLargeFilter는 파일 한 개 크기 초과
+ * (PayloadTooLargeException)만 바꾸므로, 이 메시지는 그대로 전달된다.
+ */
+class StorageQuotaExceededException extends HttpException {
+  constructor(used: number, quota: number) {
+    super(
+      {
+        statusCode: HttpStatus.PAYLOAD_TOO_LARGE,
+        message: `저장 공간이 부족합니다. 파일은 한 사람당 ${toMb(quota)}MB까지 올릴 수 있습니다(지금 ${toMb(used)}MB 사용 중). 필요 없는 파일을 지운 뒤 다시 시도해주세요.`,
+        error: 'Payload Too Large',
+      },
+      HttpStatus.PAYLOAD_TOO_LARGE,
+    );
+  }
+}
+
+/**
+ * 용량에 넣는 파일: 내 개인 과제 첨부와, 아직 멤버인 팀에 내가 올린 파일.
+ * 탈퇴하거나 내보내진 팀에 남은 파일은 더 이상 지울 수 없으므로 넣지 않는다.
+ */
+const quotaWhere = (userId: bigint): Prisma.FileWhereInput => ({
+  userId,
+  OR: [{ teamId: null }, { team: { team_members: { some: { userId } } } }],
+});
 
 const include = {
   user: { select: { nickname: true } },
@@ -116,10 +153,27 @@ export class FilesService {
     return file;
   }
 
-  /** 업로드 직후 과제·팀이 삭제됐다면(외래 키 위반) 404로 응답한다. */
-  private async create(data: Prisma.FileUncheckedCreateInput) {
+  /**
+   * 사용자별 용량을 확인하고 기록을 만든다. 같은 사용자의 업로드가 동시에 와도 한도를 넘지 않도록
+   * 트랜잭션 안에서 사용자별 advisory lock을 잡고 합계를 센다.
+   * 업로드 직후 과제·팀이 삭제됐다면(외래 키 위반) 404로 응답한다.
+   */
+  private async create(
+    data: Prisma.FileUncheckedCreateInput & { userId: bigint; size: number },
+  ) {
     try {
-      return await this.prisma.file.create({ data, include });
+      return await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(${data.userId})::text`;
+        const { _sum } = await tx.file.aggregate({
+          _sum: { size: true },
+          where: quotaWhere(data.userId),
+        });
+        const used = _sum.size ?? 0;
+        const quota = userStorageQuota();
+        if (used + data.size > quota)
+          throw new StorageQuotaExceededException(used, quota);
+        return tx.file.create({ data, include });
+      });
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
