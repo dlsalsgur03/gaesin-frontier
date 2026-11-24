@@ -6,7 +6,7 @@
 ## 연결
 
 - 주소: 백엔드와 같은 포트(기본 3001), Socket.IO 기본 경로 `/socket.io`, 기본 네임스페이스.
-- 인증: 핸드셰이크에 브라우저가 붙여 보내는 `access_token` 쿠키(REST와 같은 JWT). 프론트는 `withCredentials: true`로 연결한다.
+- 인증: 핸드셰이크에 브라우저가 붙여 보내는 로그인 쿠키(REST와 같은 JWT·같은 규칙: 로컬 개발 주소는 `access_token`, 그 밖의 주소는 `__Host-access_token`). 프론트는 `withCredentials: true`로 연결한다.
   토큰은 HttpOnly 쿠키라 스크립트가 읽지 않으며, URL이나 `auth` 필드로 보내지 않는다.
 - 출처 검사: 웹소켓에는 CORS가 적용되지 않으므로 `Origin`이 `CORS_ORIGIN` 목록에 없으면(또는 없으면) 연결을 거부한다.
   다른 사이트가 사용자의 쿠키로 연결하는 것(CSWSH)을 막는다.
