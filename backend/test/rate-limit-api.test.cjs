@@ -99,7 +99,7 @@ before(async () => {
   server = app.getHttpServer();
   const jwt = moduleRef.get(JwtService);
   for (const [key, user] of Object.entries(users))
-    cookies[key] = `access_token=${jwt.sign({ sub: user.id.toString() })}`;
+    cookies[key] = `__Host-access_token=${jwt.sign({ sub: user.id.toString() })}`;
 });
 
 after(async () => {
@@ -153,7 +153,7 @@ test('프록시 설정이 없으면 X-Forwarded-For로 IP를 바꿔도 피할 �
 
 test('다른 이메일은 따로 센다', async () => {
   const ok = await login('other@example.test', PASSWORD).expect(200);
-  assert.ok(String(ok.headers['set-cookie']).includes('access_token='));
+  assert.ok(String(ok.headers['set-cookie']).includes('__Host-access_token='));
 });
 
 test('한 IP의 로그인 요청은 계정과 관계없이 1분에 30번까지', async () => {

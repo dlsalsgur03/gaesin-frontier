@@ -8,7 +8,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
-import { readAccessTokenCookie, verifyAccessToken } from '../auth/access-token';
+import { readAccessToken, verifyAccessToken } from '../auth/access-token';
 import { isAllowedOrigin } from '../common/cors-origins';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -70,7 +70,10 @@ export class RealtimeGateway
 
   afterInit(server: Server) {
     server.use((socket: AppSocket, next) => {
-      const token = readAccessTokenCookie(socket.handshake.headers.cookie);
+      const token = readAccessToken(
+        socket.handshake.headers.cookie,
+        socket.handshake.headers.origin,
+      );
       verifyAccessToken(this.jwtService, token)
         .then((verified) => {
           if (!verified)

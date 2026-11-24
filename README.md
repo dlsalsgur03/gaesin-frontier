@@ -83,11 +83,27 @@ DB 비밀번호는 DB를 처음 만들 때만 적용되므로, 바꾸려면 `doc
 | 위치 | 명령 |
 | --- | --- |
 | `backend/` | `npm run lint`, `npx tsc --noEmit -p tsconfig.json` |
-| `backend/` | `npm run test:calendar`, `npm run test:teams`, `npm run test:files`, `npm run test:chat`, `npm run test:schedules`, `npm run test:rate-limit` — 로컬 PostgreSQL(`docker compose up -d db`) 필요 |
+| `backend/` | `npm run test:calendar`, `npm run test:teams`, `npm run test:files`, `npm run test:chat`, `npm run test:schedules`, `npm run test:rate-limit`, `npm run test:auth` — 로컬 PostgreSQL(`docker compose up -d db`) 필요 |
 | `frontend/` | `npm run lint`, `npx tsc --noEmit`, `npm run test:calendar`, `npm run build` |
 
 백엔드 통합 테스트는 `DATABASE_URL`의 로컬 DB에 무작위 스키마를 만들어 쓰고 끝나면 지운다.
 테스트가 `dist/`를 다시 빌드하므로 `npm run start:dev`는 멈춘 뒤 실행한다.
+
+## 로그인 쿠키
+
+로그인 토큰(JWT, 1시간)은 HttpOnly·SameSite=Strict 쿠키에 담는다. 이름과 Secure는 요청을 보낸 프론트엔드 주소(`Origin`)로 정한다.
+
+| 프론트엔드 주소 | 쿠키 이름 | Secure |
+| --- | --- | --- |
+| `http://localhost`, `http://127.0.0.1` (로컬 개발) | `access_token` | 끔 (http에서도 동작) |
+| 그 밖의 모든 주소, Origin 없음 (배포) | `__Host-access_token` | 켬 |
+
+- 따로 설정하지 않아도 배포 주소에서는 항상 Secure가 켜진다. 그래서 **백엔드는 HTTPS로 열어야 로그인이 된다**
+  (프록시가 HTTPS를 처리하고 백엔드는 내부에서 http로 받아도 된다).
+- `__Host-` 접두사가 붙은 쿠키는 브라우저가 Secure·`Path=/`·Domain 없음을 강제해, 다른 서브도메인이 덮어쓸 수 없다.
+  배포 주소에서 온 요청은 접두사 없는 쿠키를 받지 않는다.
+- SameSite=Strict라서 프론트엔드와 백엔드는 같은 사이트(예: `app.도메인`과 `api.도메인`)에 두어야 쿠키가 전달된다.
+- `Host` 헤더는 프록시가 바꿀 수 있어 보지 않는다. 규칙은 `backend/src/auth/access-token.ts`에 있다.
 
 ## 시도 횟수 제한
 

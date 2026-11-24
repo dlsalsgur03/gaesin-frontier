@@ -170,7 +170,7 @@ before(async () => {
   server = app.getHttpServer();
   const jwt = moduleRef.get(JwtService);
   for (const [key, user] of Object.entries(users))
-    cookies[key] = `access_token=${jwt.sign({ sub: user.id.toString() })}`;
+    cookies[key] = `__Host-access_token=${jwt.sign({ sub: user.id.toString() })}`;
 });
 
 after(async () => {
