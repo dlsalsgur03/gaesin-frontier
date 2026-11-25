@@ -7,6 +7,7 @@ import { parseId } from '../common/parse-id';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { countUnread } from './unread';
 
 const DEFAULT_LIMIT = 50;
 
@@ -91,5 +92,50 @@ export class ChatService {
     );
     this.realtime.emitToTeam(team.id, 'message:new', message);
     return { message };
+  }
+
+  /**
+   * messageId까지 읽은 것으로 표시한다. 이미 더 뒤까지 읽었다면 그대로 둔다(뒤로 돌아가지 않음).
+   * 남은 안 읽은 수를 돌려주고, 내 다른 탭·기기에도 `messages:read`로 알린다.
+   */
+  async markRead(userId: string, teamId: string, messageId: string) {
+    const team = await this.team(userId, teamId);
+    const me = BigInt(userId);
+    const message = await this.prisma.message.findFirst({
+      where: {
+        id: parseId(messageId, '유효하지 않은 메시지 ID입니다.'),
+        teamId: team.id,
+      },
+      select: { id: true },
+    });
+    if (!message) throw new NotFoundException('메시지를 찾을 수 없습니다.');
+    await this.prisma.teamMember.updateMany({
+      where: {
+        teamId: team.id,
+        userId: me,
+        OR: [
+          { lastReadMessageId: null },
+          { lastReadMessageId: { lt: message.id } },
+        ],
+      },
+      data: { lastReadMessageId: message.id },
+    });
+    const member = await this.prisma.teamMember.findUnique({
+      where: { teamId_userId: { teamId: team.id, userId: me } },
+      select: { lastReadMessageId: true },
+    });
+    // 확인과 갱신 사이에 팀을 나갔다면 더 볼 수 없는 팀이다.
+    if (!member) throw new NotFoundException('팀을 찾을 수 없습니다.');
+    const unreadCount = await countUnread(
+      this.prisma,
+      team.id,
+      me,
+      member.lastReadMessageId,
+    );
+    this.realtime.emitToUser(me, 'messages:read', {
+      teamId: team.id.toString(),
+      unreadCount,
+    });
+    return { unreadCount };
   }
 }

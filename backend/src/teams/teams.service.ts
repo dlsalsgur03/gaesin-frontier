@@ -11,6 +11,7 @@ import { Prisma } from '../generated/prisma/client';
 import { parseId } from '../common/parse-id';
 import { removeStoredFiles } from '../files/file-storage';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { countUnread } from '../chat/unread';
 
 // 혼동하기 쉬운 0/O, 1/I/L을 제외한다.
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -99,12 +100,19 @@ export class TeamsService {
       },
       orderBy: [{ joinedAt: 'desc' }, { id: 'desc' }],
     });
+    const me = BigInt(userId);
+    const unread = await Promise.all(
+      memberships.map(({ teamId, lastReadMessageId }) =>
+        countUnread(this.prisma, teamId, me, lastReadMessageId),
+      ),
+    );
     return {
-      teams: memberships.map(({ role, team }) => ({
+      teams: memberships.map(({ role, team }, index) => ({
         id: team.id.toString(),
         name: team.name,
         role,
         memberCount: team._count.team_members,
+        unreadCount: unread[index],
       })),
     };
   }
@@ -140,9 +148,20 @@ export class TeamsService {
   async join(userId: string, inviteCode: string) {
     const team = await this.prisma.team.findUnique({ where: { inviteCode } });
     if (!team) throw new NotFoundException('초대 코드가 올바르지 않습니다.');
+    // 참여하기 전의 대화는 안 읽은 메시지로 세지 않는다.
+    const latest = await this.prisma.message.findFirst({
+      where: { teamId: team.id },
+      orderBy: { id: 'desc' },
+      select: { id: true },
+    });
     try {
       await this.prisma.teamMember.create({
-        data: { teamId: team.id, userId: BigInt(userId), role: 'MEMBER' },
+        data: {
+          teamId: team.id,
+          userId: BigInt(userId),
+          role: 'MEMBER',
+          lastReadMessageId: latest?.id ?? null,
+        },
       });
     } catch (error) {
       if (isUniqueViolation(error))

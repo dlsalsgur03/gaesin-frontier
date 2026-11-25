@@ -129,11 +129,13 @@ model TeamAssignment {
 }
 
 model TeamMember {
-  id       BigInt   @id @default(autoincrement())
-  teamId   BigInt   @map("team_id")
-  userId   BigInt   @map("user_id")
-  role     TeamRole
-  joinedAt DateTime @default(now()) @map("joined_at")
+  id                BigInt   @id @default(autoincrement())
+  teamId            BigInt   @map("team_id")
+  userId            BigInt   @map("user_id")
+  role              TeamRole
+  joinedAt          DateTime @default(now()) @map("joined_at")
+  /// 마지막으로 읽은 채팅 메시지 ID. 이보다 큰 다른 사람의 메시지가 안 읽은 메시지다.
+  lastReadMessageId BigInt?  @map("last_read_message_id")
 
   user User @relation(fields: [userId], references: [id])
   team Team @relation(fields: [teamId], references: [id])

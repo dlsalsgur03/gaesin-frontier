@@ -4,6 +4,8 @@ import { useState } from "react";
 import Calendar from "./calendar/calendar";
 import PersonalAssignments from "./assignments/personal-assignments";
 import Teams from "./teams/teams";
+import UnreadBadge from "./unread-badge";
+import UnreadTracker from "./unread-tracker";
 
 const tabs = [
   { id: "calendar", label: "캘린더" },
@@ -11,10 +13,11 @@ const tabs = [
   { id: "teams", label: "팀" },
 ] as const;
 
-export default function WorkspaceTabs() {
+export default function WorkspaceTabs({ myUserId }: { myUserId: string }) {
   const [active, setActive] = useState<(typeof tabs)[number]["id"]>("calendar");
   return (
     <div className="space-y-5">
+      <UnreadTracker myUserId={myUserId} />
       <div
         role="tablist"
         aria-label="작업 공간"
@@ -48,9 +51,10 @@ export default function WorkspaceTabs() {
               setActive(tabs[next].id);
               document.getElementById(`tab-${tabs[next].id}`)?.focus();
             }}
-            className={`min-h-12 border-b-2 px-5 font-semibold focus-visible:outline-2 focus-visible:outline-blue-600 ${active === tab.id ? "border-blue-600 text-blue-700" : "border-transparent text-zinc-500 hover:text-zinc-900"}`}
+            className={`inline-flex min-h-12 items-center gap-1.5 border-b-2 px-5 font-semibold focus-visible:outline-2 focus-visible:outline-blue-600 ${active === tab.id ? "border-blue-600 text-blue-700" : "border-transparent text-zinc-500 hover:text-zinc-900"}`}
           >
             {tab.label}
+            {tab.id === "teams" && <UnreadBadge />}
           </button>
         ))}
       </div>

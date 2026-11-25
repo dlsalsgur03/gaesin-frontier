@@ -24,6 +24,8 @@ export type RealtimeEvents = {
   }) => void;
   /** 내가 팀을 떠났거나 내보내졌거나 팀이 삭제됐다. */
   "team:removed": (payload: { teamId: string }) => void;
+  /** 내가(다른 탭·기기 포함) 팀 채팅을 읽었다. 남은 안 읽은 수가 온다. */
+  "messages:read": (payload: { teamId: string; unreadCount: number }) => void;
 };
 
 export type RealtimeStatus = "connecting" | "connected" | "offline";

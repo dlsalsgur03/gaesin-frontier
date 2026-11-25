@@ -148,6 +148,11 @@ export class RealtimeGateway
     });
   }
 
+  /** 한 사용자의 모든 연결(다른 탭·기기 포함)에 이벤트를 보낸다. */
+  emitToUser(userId: bigint | string, event: string, payload: unknown) {
+    this.server?.to(userRoom(userId)).emit(event, payload);
+  }
+
   /** 팀 룸의 모든 연결(보낸 사람 포함)에 이벤트를 보낸다. */
   emitToTeam(teamId: bigint | string, event: string, payload: unknown) {
     this.server?.to(teamRoom(teamId)).emit(event, payload);

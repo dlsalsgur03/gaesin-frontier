@@ -1,15 +1,28 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, apiRequest } from "@/lib/api";
 import {
   MESSAGE_MAX_LENGTH,
+  compareId,
   mergeMessages,
   type ChatMessage,
   type MessagePage,
 } from "@/lib/chat";
 import { useRealtimeEvent, useRealtimeStatus } from "@/lib/realtime";
+import {
+  isActiveChatTeam,
+  setActiveChatTeam,
+  setUnreadCount,
+} from "@/lib/unread";
 
 const buttonClass =
   "min-h-10 shrink-0 rounded-lg border border-zinc-200 px-3 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-50";
@@ -42,6 +55,20 @@ const timeLabel = (iso: string) =>
     hour: "numeric",
     minute: "2-digit",
   });
+
+function subscribeVisibility(listener: () => void) {
+  document.addEventListener("visibilitychange", listener);
+  return () => document.removeEventListener("visibilitychange", listener);
+}
+
+/** 브라우저 탭이 보이는 중인지. 숨겨진 탭에서는 메시지를 읽음 처리하지 않는다. */
+function useDocumentVisible() {
+  return useSyncExternalStore(
+    subscribeVisibility,
+    () => document.visibilityState === "visible",
+    () => false,
+  );
+}
 
 function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
@@ -120,10 +147,42 @@ export default function TeamChat({
   const [sendError, setSendError] = useState("");
   const [unseen, setUnseen] = useState(false);
 
+  const visible = useDocumentVisible();
+  /** 마지막으로 읽음 처리를 보낸 메시지 ID. 같은 요청을 반복하지 않는다. */
+  const lastReadRef = useRef<string | null>(null);
+  const lastId = messages.at(-1)?.id;
+
   useEffect(() => {
     messagesRef.current = messages;
     phaseRef.current = phase;
   });
+
+  // 이 채팅이 보이는 동안 이 팀의 새 메시지는 안 읽은 수를 올리지 않는다(바로 읽음 처리한다).
+  useEffect(() => {
+    if (!visible) return;
+    setActiveChatTeam(teamId);
+    return () => {
+      if (isActiveChatTeam(teamId)) setActiveChatTeam(null);
+    };
+  }, [teamId, visible]);
+
+  // 채팅이 열려 있고 브라우저 탭이 보이면 마지막 메시지까지 읽은 것으로 표시한다.
+  useEffect(() => {
+    if (phase !== "ready" || !visible || !lastId) return;
+    if (lastReadRef.current && compareId(lastId, lastReadRef.current) <= 0)
+      return;
+    lastReadRef.current = lastId;
+    setUnreadCount(teamId, 0);
+    apiRequest<{ unreadCount: number }>(`/teams/${teamId}/messages/read`, {
+      method: "PUT",
+      body: JSON.stringify({ messageId: lastId }),
+    })
+      .then((data) => setUnreadCount(teamId, data.unreadCount))
+      .catch(() => {
+        // 다음 메시지나 다시 볼 때 다시 보낸다. 배지는 재연결·목록 갱신 때 서버 값으로 맞춰진다.
+        lastReadRef.current = null;
+      });
+  }, [teamId, phase, visible, lastId]);
 
   useEffect(() => {
     const controller = new AbortController();

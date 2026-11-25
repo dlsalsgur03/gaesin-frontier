@@ -6,6 +6,7 @@ import { ApiError, apiRequest } from "@/lib/api";
 import { roleLabel, type TeamDetail, type TeamSummary } from "@/lib/teams";
 import { useRealtimeEvent, useTeamChanged } from "@/lib/realtime";
 import TeamDetailPanel from "./team-detail";
+import UnreadBadge from "../unread-badge";
 
 const inputClass =
   "min-h-10 w-full min-w-0 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900";
@@ -249,8 +250,11 @@ export default function Teams() {
                         멤버 {team.memberCount}명
                       </span>
                     </span>
-                    <span className="shrink-0 rounded-md bg-zinc-100 px-2 py-1 text-xs font-semibold text-zinc-600">
-                      {roleLabel[team.role]}
+                    <span className="flex shrink-0 items-center gap-2">
+                      <UnreadBadge teamId={team.id} />
+                      <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-semibold text-zinc-600">
+                        {roleLabel[team.role]}
+                      </span>
                     </span>
                   </button>
                 </li>
