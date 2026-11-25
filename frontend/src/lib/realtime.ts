@@ -35,6 +35,11 @@ let socket: Socket | null = null;
 let subscribers = 0;
 let idleTimer: ReturnType<typeof setTimeout> | undefined;
 let recoverAttempt = 0;
+/**
+ * 마지막으로 연결이 끊겼거나 연결에 실패한 시각(ms). 이 시각 뒤에 다시 연결되면
+ * 그사이 서버 알림을 놓쳤을 수 있으므로 화면이 다시 불러온다(useTeamChanged).
+ */
+let lastGapAt = 0;
 let status: RealtimeStatus = "connecting";
 const statusListeners = new Set<() => void>();
 
@@ -75,10 +80,12 @@ function getSocket() {
     setStatus("connected");
   });
   created.on("disconnect", (reason) => {
+    lastGapAt = Date.now();
     setStatus(subscribers > 0 ? "offline" : "connecting");
     if (reason === "io server disconnect" && subscribers > 0) recover(created);
   });
   created.on("connect_error", () => {
+    lastGapAt = Date.now();
     setStatus("offline");
     // 네트워크 오류는 Socket.IO가 알아서 다시 시도한다(active). 서버가 거부한 경우만 직접 처리한다.
     if (!created.active) recover(created);
@@ -142,8 +149,31 @@ export function useRealtimeEvent<E extends keyof RealtimeEvents>(
 }
 
 /**
+ * 화면이 떠 있는 동안 연결이 끊겼다가 다시 이어지면 onResync를 부른다.
+ * 처음 연결될 때는 부르지 않는다(화면이 이미 방금 불러왔다).
+ * 서버는 다시 연결될 때 현재 소속 팀 룸에 다시 넣어 주므로, 놓친 변경만 다시 불러오면 된다.
+ */
+export function useRealtimeResync(onResync: () => void, enabled = true) {
+  const mountedAtRef = useRef(0);
+
+  useEffect(() => {
+    mountedAtRef.current = Date.now();
+  }, []);
+
+  useRealtimeEvent(
+    "connect",
+    () => {
+      if (mountedAtRef.current > 0 && lastGapAt >= mountedAtRef.current)
+        onResync();
+    },
+    enabled,
+  );
+}
+
+/**
  * 팀의 해당 범위가 바뀌면 onChange를 부른다. teamId가 null이면 모든 팀의 변경을 받는다.
  * 다른 팀원의 변경이 새로고침 없이 반영되도록 각 화면이 조용히 다시 불러오는 데 쓴다.
+ * 연결이 끊긴 동안 놓친 알림이 있을 수 있으므로, 다시 연결되면 범위와 관계없이 한 번 부른다.
  */
 export function useTeamChanged(
   teamId: string | null,
@@ -161,6 +191,7 @@ export function useTeamChanged(
     },
     enabled,
   );
+  useRealtimeResync(onChange, enabled);
 }
 
 function subscribeStatus(listener: () => void) {
