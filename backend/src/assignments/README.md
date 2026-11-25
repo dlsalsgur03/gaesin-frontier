@@ -1,6 +1,6 @@
 # 개인 과제 API
 
-모든 요청은 `access_token` 쿠키 인증이 필요하다. 소유자는 JWT에서 결정하며
+모든 요청은 로그인 쿠키(`access_token`, 배포 주소에서는 `__Host-access_token`) 인증이 필요하다. 소유자는 JWT에서 결정하며
 다른 사용자의 과제와 존재하지 않는 과제는 동일하게 404로 응답한다.
 
 - `GET /assignments`: 본인 과제 전체 목록 (200, private/no-store). 날짜 없는 과제도 포함하며 최근 등록순(createdAt/id 내림차순).

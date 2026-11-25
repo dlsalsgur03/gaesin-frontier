@@ -124,7 +124,7 @@ before(async () => {
   baseUrl = `http://127.0.0.1:${server.address().port}`;
   const jwt = moduleRef.get(JwtService);
   for (const [key, user] of Object.entries(users))
-    cookies[key] = `access_token=${jwt.sign({ sub: user.id.toString() })}`;
+    cookies[key] = `__Host-access_token=${jwt.sign({ sub: user.id.toString() })}`;
 });
 
 after(async () => {

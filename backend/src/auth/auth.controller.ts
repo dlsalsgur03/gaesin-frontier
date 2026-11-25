@@ -9,25 +9,18 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import type { CookieOptions, Response } from 'express';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { accessTokenCookie, allAccessTokenCookies } from './access-token';
+import { LoginRateLimitGuard } from '../rate-limit/rate-limit';
 import type { AuthenticatedRequest } from './jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
-
-  private getCookieOptions(): CookieOptions {
-    return {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-    };
-  }
 
   @Post('signup')
   signup(@Body() dto: SignupDto) {
@@ -36,14 +29,18 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(LoginRateLimitGuard)
   async login(
     @Body() dto: LoginDto,
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.authService.login(dto);
 
-    response.cookie('access_token', result.accessToken, {
-      ...this.getCookieOptions(),
+    // 배포 주소에서는 __Host-access_token(Secure), 로컬 개발 주소에서만 access_token(http 허용).
+    const cookie = accessTokenCookie(request.headers.origin);
+    response.cookie(cookie.name, result.accessToken, {
+      ...cookie.options,
       maxAge: 60 * 60 * 1000,
     });
 
@@ -63,7 +60,9 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   logout(@Res({ passthrough: true }) response: Response) {
-    response.clearCookie('access_token', this.getCookieOptions());
+    // 어느 환경에서 만든 쿠키든 지운다. 지울 때도 만들 때와 같은 속성이어야 브라우저가 지운다.
+    for (const cookie of allAccessTokenCookies())
+      response.clearCookie(cookie.name, cookie.options);
 
     return {
       message: '로그아웃되었습니다.',

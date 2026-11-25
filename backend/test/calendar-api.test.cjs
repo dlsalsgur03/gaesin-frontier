@@ -192,8 +192,8 @@ before(async () => {
   );
   await app.listen(0, '127.0.0.1');
   jwt = moduleRef.get(JwtService);
-  cookie = `access_token=${jwt.sign({ sub: user.id.toString() })}`;
-  otherCookie = `access_token=${jwt.sign({ sub: other.id.toString() })}`;
+  cookie = `__Host-access_token=${jwt.sign({ sub: user.id.toString() })}`;
+  otherCookie = `__Host-access_token=${jwt.sign({ sub: other.id.toString() })}`;
 });
 
 after(async () => {
@@ -222,13 +222,13 @@ test('미인증·변조·만료된 쿠키는 401', async () => {
   await request(app.getHttpServer())
     .get(endpoint)
     .query(range)
-    .set('Cookie', 'access_token=invalid')
+    .set('Cookie', '__Host-access_token=invalid')
     .expect(401);
   const expired = jwt.sign({ sub: userId.toString() }, { expiresIn: -1 });
   await request(app.getHttpServer())
     .get(endpoint)
     .query(range)
-    .set('Cookie', `access_token=${expired}`)
+    .set('Cookie', `__Host-access_token=${expired}`)
     .expect(401);
 });
 

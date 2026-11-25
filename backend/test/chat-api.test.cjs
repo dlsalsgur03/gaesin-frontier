@@ -135,7 +135,7 @@ before(async () => {
   baseUrl = `http://127.0.0.1:${server.address().port}`;
   jwt = moduleRef.get(JwtService);
   for (const [key, user] of Object.entries(users))
-    cookies[key] = `access_token=${jwt.sign({ sub: user.id.toString() })}`;
+    cookies[key] = `__Host-access_token=${jwt.sign({ sub: user.id.toString() })}`;
 });
 
 after(async () => {
@@ -220,9 +220,9 @@ function noEvent(socket, event, wait = 300) {
 test('쿠키가 없거나 잘못되면 소켓 연결을 거부한다', async () => {
   for (const cookie of [
     undefined,
-    'access_token=not-a-jwt',
-    `access_token=${jwt.sign({ sub: users.owner.id.toString() }, { secret: 'x'.repeat(40) })}`,
-    `access_token=${jwt.sign({ sub: users.owner.id.toString() }, { expiresIn: -10 })}`,
+    '__Host-access_token=not-a-jwt',
+    `__Host-access_token=${jwt.sign({ sub: users.owner.id.toString() }, { secret: 'x'.repeat(40) })}`,
+    `__Host-access_token=${jwt.sign({ sub: users.owner.id.toString() }, { expiresIn: -10 })}`,
   ]) {
     const error = await connect({ cookie }).then(
       () => assert.fail('연결되면 안 됩니다.'),
@@ -532,7 +532,7 @@ test('토큰이 만료되는 시각에 서버가 연결을 끊는다', async () 
     { sub: users.outsider.id.toString() },
     { expiresIn: 1 },
   );
-  const socket = await connect({ cookie: `access_token=${token}` });
+  const socket = await connect({ cookie: `__Host-access_token=${token}` });
   const reason = await nextEvent(socket, 'disconnect', 3000);
   assert.equal(reason, 'io server disconnect');
 });

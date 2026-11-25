@@ -2,7 +2,7 @@
 
 `GET /calendar/assignments?from=2026-08-30&to=2026-10-10`
 
-로그인 시 발급한 `access_token` 쿠키가 필요하다. 응답은 `Cache-Control: private, no-store`로 캐시하지 않는다.
+로그인 쿠키(`access_token`, 배포 주소에서는 `__Host-access_token`)가 필요하다. 응답은 `Cache-Control: private, no-store`로 캐시하지 않는다.
 
 ## 조회 조건
 

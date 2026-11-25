@@ -17,6 +17,7 @@ FROM build AS prune
 RUN npm prune --omit=dev
 
 FROM base AS runtime
+ENV NODE_ENV=production
 COPY --from=prune /app/package.json ./package.json
 COPY --from=prune /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist

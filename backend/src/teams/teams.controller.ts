@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../auth/jwt-auth.guard';
+import { InviteCodeRateLimitGuard } from '../rate-limit/rate-limit';
 import { JoinTeamDto, TeamNameDto, TransferTeamDto } from './team.dto';
 import { TeamsService } from './teams.service';
 
@@ -33,6 +34,7 @@ export class TeamsController {
   }
 
   @Post('join')
+  @UseGuards(InviteCodeRateLimitGuard)
   join(@Req() req: AuthenticatedRequest, @Body() dto: JoinTeamDto) {
     return this.service.join(req.userId, dto.inviteCode);
   }

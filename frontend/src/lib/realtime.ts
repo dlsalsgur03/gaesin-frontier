@@ -7,7 +7,7 @@ import type { ChatMessage } from "./chat";
 
 /**
  * 백엔드와의 실시간 연결(Socket.IO). 화면 전체가 연결 하나를 함께 쓴다.
- * 인증은 브라우저가 붙여 보내는 access_token 쿠키로 하며, 서버가 소속 팀 룸에 자동으로 넣는다.
+ * 인증은 브라우저가 붙여 보내는 로그인 쿠키(배포 시 __Host-access_token, 로컬 개발 시 access_token)로 하며, 서버가 소속 팀 룸에 자동으로 넣는다.
  * 클라이언트가 보내는 이벤트는 없고 서버 알림만 받는다.
  */
 /** team:changed가 알리는 변경 범위 */

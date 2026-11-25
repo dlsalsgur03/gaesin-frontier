@@ -6,6 +6,15 @@ import path from 'node:path';
 /** 파일 한 개의 최대 크기(20MB). 형식은 제한하지 않고 항상 다운로드로만 내려준다. */
 export const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
+/**
+ * 한 사용자가 올릴 수 있는 파일 총량(바이트). 기본 200MB, USER_STORAGE_QUOTA_MB로 바꾼다.
+ * 서버 디스크가 한 사람 때문에 가득 차지 않게 막는다.
+ */
+export function userStorageQuota() {
+  const mb = Number(process.env.USER_STORAGE_QUOTA_MB || 200);
+  return Math.floor((Number.isFinite(mb) && mb > 0 ? mb : 200) * 1024 * 1024);
+}
+
 const KEY_PATTERN = /^[0-9a-f-]{36}$/;
 const logger = new Logger('FileStorage');
 

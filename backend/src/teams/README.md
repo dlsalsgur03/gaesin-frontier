@@ -1,6 +1,6 @@
 # 팀 API
 
-모든 요청은 `access_token` 쿠키 인증이 필요하다. 사용자는 JWT에서 결정한다.
+모든 요청은 로그인 쿠키(`access_token`, 배포 주소에서는 `__Host-access_token`) 인증이 필요하다. 사용자는 JWT에서 결정한다.
 멤버가 아닌 팀과 존재하지 않는 팀은 동일하게 404, 멤버지만 소유자가 아니면 403이다.
 소유자는 `Team.ownerId`가 기준이며 소유자의 `TeamMember.role`도 항상 `OWNER`로 맞춘다.
 

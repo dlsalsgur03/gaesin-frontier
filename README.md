@@ -82,8 +82,8 @@ Docker로 전체를 실행 중이면 3000·3001 포트가 겹치므로 `docker c
 
 | 파일 | 필요할 때 | 값 |
 | --- | --- | --- |
-| `.env` (선택) | Docker 기본값을 바꿀 때 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `JWT_SECRET` |
-| `backend/.env` | 백엔드를 Node로 직접 실행 | `DATABASE_URL`(localhost:5433), `JWT_SECRET`, `PORT`, `CORS_ORIGIN`, `UPLOAD_DIR`(선택, 기본 `backend/uploads`) |
+| `.env` (선택) | Docker 기본값을 바꿀 때 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `JWT_SECRET`, `USER_STORAGE_QUOTA_MB`, `TRUST_PROXY` |
+| `backend/.env` | 백엔드를 Node로 직접 실행 | `DATABASE_URL`(localhost:5433), `JWT_SECRET`, `PORT`, `CORS_ORIGIN`, `UPLOAD_DIR`(선택, 기본 `backend/uploads`), `USER_STORAGE_QUOTA_MB`(선택, 기본 200), `TRUST_PROXY`(선택, 프록시 뒤 배포 시) |
 | `frontend/.env.local` | 프론트엔드를 Node로 직접 실행 | `NEXT_PUBLIC_API_URL`(기본 `http://localhost:3001`) |
 
 `node scripts/setup-env.mjs`는 `backend/.env`와 `frontend/.env.local`을 만들고, 이미 있는 파일은 건드리지 않는다.
@@ -94,11 +94,40 @@ DB 비밀번호는 DB를 처음 만들 때만 적용되므로, 바꾸려면 `doc
 | 위치 | 명령 |
 | --- | --- |
 | `backend/` | `npm run lint`, `npx tsc --noEmit -p tsconfig.json` |
-| `backend/` | `npm run test:calendar`, `npm run test:teams`, `npm run test:files`, `npm run test:chat`, `npm run test:schedules` — 로컬 PostgreSQL(`docker compose up -d db`) 필요 |
+| `backend/` | `npm run test:calendar`, `npm run test:teams`, `npm run test:files`, `npm run test:chat`, `npm run test:schedules`, `npm run test:rate-limit`, `npm run test:auth` — 로컬 PostgreSQL(`docker compose up -d db`) 필요 |
 | `frontend/` | `npm run lint`, `npx tsc --noEmit`, `npm run test:calendar`, `npm run build` |
 
 백엔드 통합 테스트는 `DATABASE_URL`의 로컬 DB에 무작위 스키마를 만들어 쓰고 끝나면 지운다.
 테스트가 `dist/`를 다시 빌드하므로 `npm run start:dev`는 멈춘 뒤 실행한다.
+
+## 로그인 쿠키
+
+로그인 토큰(JWT, 1시간)은 HttpOnly·SameSite=Strict 쿠키에 담는다. 이름과 Secure는 요청을 보낸 프론트엔드 주소(`Origin`)로 정한다.
+
+| 프론트엔드 주소 | 쿠키 이름 | Secure |
+| --- | --- | --- |
+| `http://localhost`, `http://127.0.0.1` (로컬 개발) | `access_token` | 끔 (http에서도 동작) |
+| 그 밖의 모든 주소, Origin 없음 (배포) | `__Host-access_token` | 켬 |
+
+- 따로 설정하지 않아도 배포 주소에서는 항상 Secure가 켜진다. 그래서 **백엔드는 HTTPS로 열어야 로그인이 된다**
+  (프록시가 HTTPS를 처리하고 백엔드는 내부에서 http로 받아도 된다).
+- `__Host-` 접두사가 붙은 쿠키는 브라우저가 Secure·`Path=/`·Domain 없음을 강제해, 다른 서브도메인이 덮어쓸 수 없다.
+  배포 주소에서 온 요청은 접두사 없는 쿠키를 받지 않는다.
+- SameSite=Strict라서 프론트엔드와 백엔드는 같은 사이트(예: `app.도메인`과 `api.도메인`)에 두어야 쿠키가 전달된다.
+- `Host` 헤더는 프록시가 바꿀 수 있어 보지 않는다. 규칙은 `backend/src/auth/access-token.ts`에 있다.
+
+## 시도 횟수 제한
+
+무작위 대입을 막기 위해 아래 요청은 횟수를 제한한다. 넘으면 429와 `Retry-After`(초), 한국어 메시지로 응답한다.
+
+| 요청 | 기준 | 제한 |
+| --- | --- | --- |
+| `POST /auth/login` | IP + 이메일 | 1분에 5번, 넘으면 5분 차단 |
+| `POST /auth/login` | IP | 1분에 30번 |
+| `POST /teams/join` | 로그인한 사용자 | 10분에 10번, 넘으면 10분 차단 |
+
+기록은 서버 메모리에 있어 서버를 다시 켜면 초기화된다. 프록시 뒤에 배포하면 `TRUST_PROXY`를 프록시 단계 수로 지정해야
+사용자마다 따로 센다(지정하지 않으면 모든 사용자가 프록시 IP 하나로 묶인다). 규칙은 `backend/src/rate-limit/rate-limit.ts`에 있다.
 
 API 계약은 `backend/src/{assignments,calendar,teams,team-assignments,files,chat,schedules}/README.md`에,
 실시간 연결(소켓 인증·이벤트)은 `backend/src/realtime/README.md`에 있다.

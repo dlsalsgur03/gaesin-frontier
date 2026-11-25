@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
-import { ACCESS_TOKEN_COOKIE, verifyAccessToken } from './access-token';
+import { readAccessToken, verifyAccessToken } from './access-token';
 
 export interface AuthenticatedRequest extends Request {
   userId: string;
@@ -19,8 +19,7 @@ export class JwtAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
-    const cookies = request.cookies as Record<string, unknown> | undefined;
-    const token = cookies?.[ACCESS_TOKEN_COOKIE];
+    const token = readAccessToken(request.headers.cookie, request.headers.origin);
 
     if (typeof token !== 'string' || !token) {
       throw new UnauthorizedException('로그인이 필요합니다.');
