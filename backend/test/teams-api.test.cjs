@@ -177,7 +177,13 @@ test('팀을 만들면 생성자가 OWNER 멤버가 된다', async () => {
   const list = await as('owner').get('/teams').expect(200);
   assert.equal(list.headers['cache-control'], 'private, no-store');
   assert.deepEqual(list.body.teams, [
-    { id: teamId, name: '캡스톤 팀', role: 'OWNER', memberCount: 1 },
+    {
+      id: teamId,
+      name: '캡스톤 팀',
+      role: 'OWNER',
+      memberCount: 1,
+      unreadCount: 0,
+    },
   ]);
 });
 
@@ -202,7 +208,13 @@ test('초대 코드로 참여하고 중복 참여와 잘못된 코드는 거부�
   await as('outsider').post('/teams/join').send({ inviteCode: '' }).expect(400);
   const list = await as('member').get('/teams').expect(200);
   assert.deepEqual(list.body.teams, [
-    { id: teamId, name: '캡스톤 팀', role: 'MEMBER', memberCount: 2 },
+    {
+      id: teamId,
+      name: '캡스톤 팀',
+      role: 'MEMBER',
+      memberCount: 2,
+      unreadCount: 0,
+    },
   ]);
 });
 

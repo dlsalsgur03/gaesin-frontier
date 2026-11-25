@@ -130,7 +130,7 @@ export default function Home() {
             )}
           </div>
         )}
-        {user && <WorkspaceTabs />}
+        {user && <WorkspaceTabs myUserId={user.id} />}
       </div>
     </main>
   );

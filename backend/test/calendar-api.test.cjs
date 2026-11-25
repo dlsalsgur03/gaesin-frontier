@@ -564,3 +564,147 @@ test('등록·진행 중·완료 상태를 저장하고 목록과 캘린더에 �
     .set('Cookie', cookie)
     .expect(200);
 });
+
+test('캘린더 할 일은 나에게 배정되고 기간 안에 마감일이 있는 현재 소속 팀 할 일만 돌려준다', async () => {
+  const owner = await prisma.user.create({
+    data: {
+      email: 'task-owner@example.test',
+      nickname: '팀장',
+      passwordHash: 'not-a-login-password',
+    },
+  });
+  const team = await prisma.team.create({
+    data: {
+      name: '할 일 팀',
+      inviteCode: 'tasks',
+      ownerId: owner.id,
+      team_members: {
+        create: [
+          { userId: owner.id, role: 'OWNER' },
+          { userId, role: 'MEMBER' },
+        ],
+      },
+    },
+  });
+  const outside = await prisma.team.create({
+    data: {
+      name: '나간 팀',
+      inviteCode: 'left',
+      ownerId: owner.id,
+      team_members: { create: { userId: owner.id, role: 'OWNER' } },
+    },
+  });
+  const assignment = await prisma.teamAssignment.create({
+    data: { teamId: team.id, title: '발표 준비' },
+  });
+  const outsideAssignment = await prisma.teamAssignment.create({
+    data: { teamId: outside.id, title: '나간 팀 과제' },
+  });
+  await prisma.task.createMany({
+    data: [
+      {
+        teamAssignmentId: assignment.id,
+        assigneeId: userId,
+        title: '자료 조사',
+        description: '논문 3편',
+        dueDate: at('2026-09-19'),
+        status: 'IN_PROGRESS',
+      },
+      {
+        teamAssignmentId: assignment.id,
+        assigneeId: userId,
+        title: '시작 경계',
+        dueDate: at(range.from),
+        status: 'DONE',
+      },
+      {
+        teamAssignmentId: assignment.id,
+        assigneeId: userId,
+        title: '끝 경계',
+        dueDate: at(range.to),
+      },
+      {
+        teamAssignmentId: assignment.id,
+        assigneeId: userId,
+        title: '기간 이후',
+        dueDate: at('2026-10-11'),
+      },
+      {
+        teamAssignmentId: assignment.id,
+        assigneeId: userId,
+        title: '마감일 없음',
+      },
+      {
+        teamAssignmentId: assignment.id,
+        assigneeId: owner.id,
+        title: '다른 사람 할 일',
+        dueDate: at('2026-09-19'),
+      },
+      {
+        teamAssignmentId: assignment.id,
+        title: '미배정 할 일',
+        dueDate: at('2026-09-19'),
+      },
+      {
+        teamAssignmentId: outsideAssignment.id,
+        assigneeId: userId,
+        title: '소속 아닌 팀 할 일',
+        dueDate: at('2026-09-19'),
+      },
+    ],
+  });
+
+  await request(app.getHttpServer())
+    .get('/calendar/tasks')
+    .query(range)
+    .expect(401);
+  await request(app.getHttpServer())
+    .get('/calendar/tasks')
+    .query({ from: '2026-09-01', to: '2026-11-30' })
+    .set('Cookie', cookie)
+    .expect(400);
+
+  const response = await request(app.getHttpServer())
+    .get('/calendar/tasks')
+    .query(range)
+    .set('Cookie', cookie)
+    .expect(200);
+  assert.equal(response.headers['cache-control'], 'private, no-store');
+  assert.deepEqual(
+    response.body.tasks.map((task) => task.title),
+    ['시작 경계', '자료 조사', '끝 경계'],
+  );
+  const detail = response.body.tasks[1];
+  assert.deepEqual(
+    { ...detail, id: undefined },
+    {
+      id: undefined,
+      title: '자료 조사',
+      description: '논문 3편',
+      status: 'IN_PROGRESS',
+      dueDate: '2026-09-19',
+      assigneeId: userId.toString(),
+      teamAssignmentId: assignment.id.toString(),
+      teamAssignmentTitle: '발표 준비',
+      teamId: team.id.toString(),
+      teamName: '할 일 팀',
+    },
+  );
+
+  // 다른 팀원에게는 내 할 일이 보이지 않는다.
+  const { body: others } = await request(app.getHttpServer())
+    .get('/calendar/tasks')
+    .query(range)
+    .set('Cookie', otherCookie)
+    .expect(200);
+  assert.deepEqual(others.tasks, []);
+
+  // 팀을 나가면 더 이상 보이지 않는다.
+  await prisma.teamMember.deleteMany({ where: { teamId: team.id, userId } });
+  const { body: after } = await request(app.getHttpServer())
+    .get('/calendar/tasks')
+    .query(range)
+    .set('Cookie', cookie)
+    .expect(200);
+  assert.deepEqual(after.tasks, []);
+});

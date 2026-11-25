@@ -31,6 +31,7 @@
 | `message:new` | 팀 룸(보낸 사람 포함) | 저장된 채팅 메시지. 형식은 `../chat/README.md` |
 | `team:changed` | 팀 룸(변경한 사람 포함) | `{ teamId, scopes }`. 범위만 알리고 내용은 보내지 않는다 |
 | `team:removed` | 떠난 사용자 또는 삭제된 팀의 룸 | `{ teamId }`. 그 팀 화면을 닫는다 |
+| `messages:read` | 읽음 표시한 사용자의 모든 연결(`user:{id}`) | `{ teamId, unreadCount }`. 다른 탭·기기의 안 읽은 배지를 맞춘다 |
 
 `team:changed`의 `scopes`(하나 이상)와 보내는 시점:
 
@@ -44,8 +45,13 @@
 프론트는 이 알림을 받으면 지금 화면을 그대로 보인 채 REST로 다시 불러온다(열린 채팅·입력 내용 유지).
 캘린더 탭은 모든 팀의 `assignments`·`schedules`·`team` 변경과 `team:removed`를 받아 보고 있는 달을 조용히 다시 불러온다.
 
+**재연결 시 다시 불러오기**: 연결이 끊긴 동안 온 알림은 사라진다. 그래서 화면이 떠 있는 동안 연결이 끊겼다가(또는 연결에 실패했다가)
+다시 이어지면, `useTeamChanged`를 쓰는 모든 화면이 범위와 관계없이 한 번 조용히 다시 불러온다(`useRealtimeResync`, `frontend/src/lib/realtime.ts`).
+처음 연결될 때는 부르지 않는다. 서버는 다시 연결될 때 현재 소속 팀 룸에 다시 넣으므로, 끊긴 동안 내보내진 팀은 다시 불러올 때 404로 닫힌다.
+채팅은 따로 마지막 메시지 이후를 불러와 빈틈을 채우고, 안 읽은 배지는 `GET /teams`로 다시 맞춘다.
+
 ## 구현
 
 `realtime.gateway.ts`의 `RealtimeGateway`가 연결 인증·룸 관리와 알림 메서드(`joinTeam`, `leaveTeam`, `closeTeam`,
-`teamChanged`, `emitToTeam`)를 제공한다. 서비스는 이 메서드를 DB 커밋 뒤에 부른다.
+`teamChanged`, `emitToTeam`, `emitToUser`)를 제공한다. 서비스는 이 메서드를 DB 커밋 뒤에 부른다.
 서버 한 대를 전제로 한다. 여러 대로 늘리면 Socket.IO 어댑터(예: Redis)가 필요하다.

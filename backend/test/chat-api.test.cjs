@@ -536,3 +536,92 @@ test('토큰이 만료되는 시각에 서버가 연결을 끊는다', async () 
   const reason = await nextEvent(socket, 'disconnect', 3000);
   assert.equal(reason, 'io server disconnect');
 });
+
+test('안 읽은 메시지 수는 다른 사람이 보낸 새 메시지만 세고, 읽음 표시는 뒤로 돌아가지 않는다', async () => {
+  const unreadTeam = await prisma.team.create({
+    data: {
+      name: '안 읽음 팀',
+      inviteCode: 'UNREADTM22',
+      ownerId: users.owner.id,
+      team_members: {
+        create: [
+          { userId: users.owner.id, role: 'OWNER' },
+          { userId: users.member.id, role: 'MEMBER' },
+        ],
+      },
+    },
+  });
+  const path = `/teams/${unreadTeam.id}/messages`;
+  const unreadOf = async (key) => {
+    const { body } = await as(key).get('/teams').expect(200);
+    return body.teams.find(({ id }) => id === unreadTeam.id.toString())
+      ?.unreadCount;
+  };
+
+  const o1 = (
+    await as('owner').post(path).send({ content: '첫 번째' }).expect(201)
+  ).body.message;
+  await as('owner').post(path).send({ content: '두 번째' }).expect(201);
+  const m1 = (
+    await as('member').post(path).send({ content: '답장' }).expect(201)
+  ).body.message;
+
+  assert.equal(await unreadOf('member'), 2);
+  assert.equal(await unreadOf('owner'), 1);
+
+  // 읽음 표시는 내 다른 연결에도 알린다.
+  const memberSocket = await connect({ cookie: cookies.member });
+  await settle();
+  const event = nextEvent(memberSocket, 'messages:read');
+  const partial = await as('member')
+    .put(`${path}/read`)
+    .send({ messageId: o1.id })
+    .expect(200);
+  assert.deepEqual(partial.body, { unreadCount: 1 });
+  assert.deepEqual(await event, {
+    teamId: unreadTeam.id.toString(),
+    unreadCount: 1,
+  });
+
+  await as('member').put(`${path}/read`).send({ messageId: m1.id }).expect(200);
+  assert.equal(await unreadOf('member'), 0);
+  // 예전 메시지로 다시 표시해도 뒤로 돌아가지 않는다.
+  const back = await as('member')
+    .put(`${path}/read`)
+    .send({ messageId: o1.id })
+    .expect(200);
+  assert.deepEqual(back.body, { unreadCount: 0 });
+  memberSocket.disconnect();
+
+  // 입력 검증과 권한
+  await request(server)
+    .put(`${path}/read`)
+    .send({ messageId: o1.id })
+    .expect(401);
+  await as('member').put(`${path}/read`).send({ messageId: 'abc' }).expect(400);
+  await as('member').put(`${path}/read`).send({}).expect(400);
+  await as('outsider')
+    .put(`${path}/read`)
+    .send({ messageId: o1.id })
+    .expect(404);
+  const foreign = (
+    await as('outsider')
+      .post(`/teams/${otherTeam.id}/messages`)
+      .send({ content: '다른 팀 메시지' })
+      .expect(201)
+  ).body.message;
+  await as('member')
+    .put(`${path}/read`)
+    .send({ messageId: foreign.id })
+    .expect(404);
+
+  // 나중에 참여한 사람에게 참여 전 대화는 안 읽은 메시지가 아니다.
+  await as('joiner')
+    .post('/teams/join')
+    .send({ inviteCode: 'UNREADTM22' })
+    .expect(201);
+  assert.equal(await unreadOf('joiner'), 0);
+  await as('owner').post(path).send({ content: '어서 와요' }).expect(201);
+  assert.equal(await unreadOf('joiner'), 1);
+  assert.equal(await unreadOf('member'), 1);
+});

@@ -39,3 +39,10 @@ export class MessagesQueryDto {
   @Max(100, { message: 'limit은 100 이하여야 합니다.' })
   limit?: number;
 }
+
+/** 이 메시지까지 읽었다. 같은 팀의 메시지여야 한다. */
+export class ReadMessagesDto {
+  @IsString()
+  @Matches(/^[1-9]\d{0,18}$/, { message: '유효하지 않은 메시지 ID입니다.' })
+  messageId: string;
+}

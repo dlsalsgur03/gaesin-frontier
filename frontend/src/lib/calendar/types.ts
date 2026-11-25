@@ -22,3 +22,17 @@ export type AssignmentSegment = {
   continuesBefore: boolean;
   continuesAfter: boolean;
 };
+
+/** 캘린더에 표시할 내 할 일(나에게 배정, 마감일 있음). 마감일은 UTC 기준 YYYY-MM-DD다. */
+export type CalendarTask = {
+  id: string;
+  title: string;
+  description: string;
+  status: AssignmentStatus;
+  dueDate: string;
+  assigneeId: string;
+  teamAssignmentId: string;
+  teamAssignmentTitle: string;
+  teamId: string;
+  teamName: string;
+};

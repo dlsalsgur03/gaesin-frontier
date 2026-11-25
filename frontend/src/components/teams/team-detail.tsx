@@ -6,6 +6,7 @@ import { ApiError, apiRequest } from "@/lib/api";
 import { roleLabel, type TeamDetail, type TeamMember } from "@/lib/teams";
 import TeamAssignments from "./team-assignments";
 import { useRealtimeEvent, useTeamChanged } from "@/lib/realtime";
+import UnreadBadge from "../unread-badge";
 import FilePanel from "../files/file-panel";
 import TeamChat from "./team-chat";
 import TeamSchedules from "./team-schedules";
@@ -272,9 +273,10 @@ export default function TeamDetailPanel({
             type="button"
             aria-current={section === item.id ? "page" : undefined}
             onClick={() => setSection(item.id)}
-            className={`min-h-11 border-b-2 px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-blue-600 ${section === item.id ? "border-blue-600 text-blue-700" : "border-transparent text-zinc-500 hover:text-zinc-900"}`}
+            className={`inline-flex min-h-11 items-center gap-1.5 border-b-2 px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-blue-600 ${section === item.id ? "border-blue-600 text-blue-700" : "border-transparent text-zinc-500 hover:text-zinc-900"}`}
           >
             {item.label}
+            {item.id === "chat" && <UnreadBadge teamId={team.id} />}
           </button>
         ))}
       </nav>

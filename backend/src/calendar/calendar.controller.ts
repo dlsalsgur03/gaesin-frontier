@@ -17,4 +17,13 @@ export class CalendarController {
   ) {
     return this.calendarService.getAssignments(request.userId, query);
   }
+
+  @Get('tasks')
+  @Header('Cache-Control', 'private, no-store')
+  getTasks(
+    @Req() request: AuthenticatedRequest,
+    @Query() query: CalendarQueryDto,
+  ) {
+    return this.calendarService.getTasks(request.userId, query);
+  }
 }

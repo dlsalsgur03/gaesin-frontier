@@ -5,6 +5,7 @@ import {
   Header,
   Param,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -12,7 +13,7 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../auth/jwt-auth.guard';
 import { ChatService } from './chat.service';
-import { MessageDto, MessagesQueryDto } from './message.dto';
+import { MessageDto, MessagesQueryDto, ReadMessagesDto } from './message.dto';
 
 @Controller('teams/:teamId/messages')
 @UseGuards(JwtAuthGuard)
@@ -36,5 +37,14 @@ export class ChatController {
     @Body() dto: MessageDto,
   ) {
     return this.service.send(req.userId, teamId, dto.content);
+  }
+
+  @Put('read')
+  read(
+    @Req() req: AuthenticatedRequest,
+    @Param('teamId') teamId: string,
+    @Body() dto: ReadMessagesDto,
+  ) {
+    return this.service.markRead(req.userId, teamId, dto.messageId);
   }
 }

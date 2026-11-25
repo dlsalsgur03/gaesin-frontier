@@ -4,7 +4,7 @@
 멤버가 아닌 팀과 존재하지 않는 팀은 동일하게 404, 멤버지만 소유자가 아니면 403이다.
 소유자는 `Team.ownerId`가 기준이며 소유자의 `TeamMember.role`도 항상 `OWNER`로 맞춘다.
 
-- `GET /teams`: 내가 속한 팀 목록 (200, private/no-store). 최근 참여순. `{ teams: [{ id, name, role, memberCount }] }`
+- `GET /teams`: 내가 속한 팀 목록 (200, private/no-store). 최근 참여순. `{ teams: [{ id, name, role, memberCount, unreadCount }] }`. `unreadCount`는 안 읽은 채팅 메시지 수(`../chat/README.md`)
 - `POST /teams`: 팀 생성 (201). 생성자는 OWNER 멤버가 되고 초대 코드를 발급한다.
 - `POST /teams/join`: 초대 코드로 참여 (201). 잘못된 코드는 404, 이미 참여했으면 409.
 - `GET /teams/:id`: 상세 (200, private/no-store, 멤버)

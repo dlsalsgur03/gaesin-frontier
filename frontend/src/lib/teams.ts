@@ -8,6 +8,8 @@ export type TeamSummary = {
   name: string;
   role: TeamRole;
   memberCount: number;
+  /** 다른 사람이 보낸 안 읽은 채팅 메시지 수 */
+  unreadCount: number;
 };
 
 export type TeamMember = {
