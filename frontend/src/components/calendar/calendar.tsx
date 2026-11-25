@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, apiRequest } from "@/lib/api";
 import { dateKey, getMonthWeeks, startOfMonth } from "@/lib/calendar/dates";
-import type { CalendarAssignment } from "@/lib/calendar/types";
+import type { CalendarAssignment, CalendarTask } from "@/lib/calendar/types";
 import { useRealtimeEvent, useTeamChanged } from "@/lib/realtime";
 import type { Schedule } from "@/lib/schedules";
 import MonthCalendar from "./month-calendar";
@@ -19,6 +19,7 @@ export default function Calendar() {
     key: string;
     assignments: CalendarAssignment[];
     schedules: Schedule[];
+    tasks: CalendarTask[];
     error: string;
   } | null>(null);
   const weeks = getMonthWeeks(month);
@@ -44,21 +45,26 @@ export default function Calendar() {
             lastDay.getDate() + 1,
           ).toISOString(),
         });
-        const [assignmentData, scheduleData] = await Promise.all([
+        const dayQuery = new URLSearchParams({ from, to });
+        const [assignmentData, scheduleData, taskData] = await Promise.all([
           apiRequest<{ assignments: CalendarAssignment[] }>(
-            `/calendar/assignments?${new URLSearchParams({ from, to })}`,
+            `/calendar/assignments?${dayQuery}`,
             { signal: controller.signal },
           ),
           apiRequest<{ schedules: Schedule[] }>(
             `/calendar/schedules?${scheduleQuery}`,
             { signal: controller.signal },
           ),
+          apiRequest<{ tasks: CalendarTask[] }>(`/calendar/tasks?${dayQuery}`, {
+            signal: controller.signal,
+          }),
         ]);
         if (active)
           setResult({
             key: requestKey,
             assignments: assignmentData.assignments,
             schedules: scheduleData.schedules,
+            tasks: taskData.tasks,
             error: "",
           });
       } catch (error: unknown) {
@@ -73,6 +79,7 @@ export default function Calendar() {
                 key: requestKey,
                 assignments: [],
                 schedules: [],
+                tasks: [],
                 error:
                   error instanceof Error
                     ? error.message
@@ -89,7 +96,8 @@ export default function Calendar() {
     };
   }, [from, to, requestKey, quiet, router]);
 
-  // 팀 과제·일정 변경, 팀 이름 변경, 참여·탈퇴·삭제를 새로고침 없이 반영한다.
+  // 팀 과제·할 일·일정 변경, 팀 이름 변경, 참여·탈퇴·삭제를 새로고침 없이 반영한다.
+  // 할 일 변경은 서버가 assignments 범위로 알린다.
   useTeamChanged(null, ["assignments", "schedules", "team"], () =>
     setQuiet((value) => value + 1),
   );
@@ -104,6 +112,7 @@ export default function Calendar() {
       onMonthChange={setMonth}
       assignments={current?.assignments ?? []}
       schedules={current?.schedules ?? []}
+      tasks={current?.tasks ?? []}
       isLoading={!current}
       error={current?.error ?? ""}
       onReload={() => setRevision((value) => value + 1)}
