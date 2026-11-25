@@ -19,10 +19,21 @@
 ```sh
 git clone <fork한 저장소 주소>
 cd gaesin-frontier
-docker compose up --build
+bash build_image.sh     # 이미지 빌드 (처음 한 번, 코드를 바꾼 뒤에도)
+bash start_server.sh    # 서버 실행 → http://localhost:3000
 ```
 
-http://localhost:3000 에 접속해 회원가입한다.
+http://localhost:3000 에 접속해 회원가입한다. 서버는 백그라운드에서 돌고, 끌 때는 아래처럼 한다.
+
+```sh
+bash stop_server.sh            # 종료 (데이터는 남는다)
+bash stop_server.sh --reset    # 종료하고 DB·업로드 파일까지 삭제
+```
+
+스크립트는 Docker 설치·실행 여부를 먼저 확인하고, `start_server.sh`는 서버가 실제로 응답할 때까지 기다린 뒤 주소를 알려 준다.
+`start_server.sh`는 이미지를 다시 빌드하지 않으므로, 코드를 바꾸거나 새로 받은(pull) 뒤에는 `build_image.sh`를 먼저 실행한다.
+Windows에서는 Git Bash나 WSL에서 실행한다.
+스크립트 없이 `docker compose up --build`로도 실행할 수 있다. 이때는 매번 빌드를 확인하고, 터미널에 붙은 채로 돌며 `Ctrl+C`로 끈다.
 
 `docker compose up`은 DB → 마이그레이션 → 백엔드(3001) → 프론트엔드(3000) 순서로 띄운다.
 코드를 바꾼 뒤에는 `--build`를 붙여 다시 실행한다. 종료는 `docker compose down`
